@@ -11,14 +11,14 @@ A Spring Boot POC that receives JSON webhooks from TradingView Pine Script strat
 - **JWT Authentication**: Secure admin endpoints with JWT tokens
 - **Mock Order Execution**: Console logging for POC (easily switchable to real API)
 - **Swagger UI**: Interactive API documentation
-- **H2 Database**: File-based in-memory database with persistence
+- **H2 Database**: In-memory database with seed data
 
 ## Tech Stack
 
 - **Java 17+**
 - **Spring Boot 3.2.0**
 - **Maven**
-- **H2 Database** (file-based)
+- **H2 Database** (in-memory)
 - **Spring Security** (JWT)
 - **Lombok**
 - **Swagger/OpenAPI**
@@ -58,9 +58,10 @@ The application will start on `http://localhost:8080`
 
 - **Swagger UI**: http://localhost:8080/swagger-ui/index.html
 - **H2 Console**: http://localhost:8080/h2-console
-  - JDBC URL: `jdbc:h2:file:./data/hyperliquid-db`
+  - JDBC URL: `jdbc:h2:mem:hyperliquid-db`
   - Username: `sa`
   - Password: (leave empty)
+  - **Note**: In-memory database - data resets on restart
 
 ## API Endpoints
 
