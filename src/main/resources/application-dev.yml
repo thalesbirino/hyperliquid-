@@ -1,0 +1,24 @@
+spring:
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+
+  h2:
+    console:
+      enabled: true
+      settings:
+        web-allow-others: true
+
+hyperliquid:
+  api:
+    mock-mode: true
+    use-testnet: true
+
+logging:
+  level:
+    com.trading.hyperliquid: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.security: DEBUG

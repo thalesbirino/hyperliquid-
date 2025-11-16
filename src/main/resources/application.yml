@@ -1,0 +1,73 @@
+spring:
+  application:
+    name: hyperliquid-trading-bot
+
+  datasource:
+    url: jdbc:h2:file:./data/hyperliquid-db
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+    defer-datasource-initialization: true
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+      settings:
+        web-allow-others: false
+
+  sql:
+    init:
+      mode: always
+
+server:
+  port: 8080
+  error:
+    include-message: always
+    include-binding-errors: always
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET:Y29tcGxleF9qd3Rfc2VjcmV0X2tleV9mb3JfaHlwZXJsaXF1aWRfYm90XzIwMjVfcG9jX3ZlcnlfbG9uZ19zZWN1cmVfc3RyaW5n}
+  expiration: 86400000 # 24 hours in milliseconds
+
+# Hyperliquid API Configuration
+hyperliquid:
+  api:
+    testnet-url: https://api.hyperliquid-testnet.xyz
+    mainnet-url: https://api.hyperliquid.xyz
+    use-testnet: true
+    mock-mode: true # Set to false for real API calls
+  websocket:
+    testnet-url: wss://api.hyperliquid-testnet.xyz/ws
+    mainnet-url: wss://api.hyperliquid.xyz/ws
+
+# Logging Configuration
+logging:
+  level:
+    com.trading.hyperliquid: DEBUG
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# Swagger/OpenAPI Configuration
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    tags-sorter: alpha
+    operations-sorter: alpha
