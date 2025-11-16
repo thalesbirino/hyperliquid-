@@ -1,0 +1,445 @@
+{
+  "info": {
+    "name": "Hyperliquid Trading Bot API",
+    "description": "TradingView Webhook to Hyperliquid Order Execution POC",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "12345678"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{jwt_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.environment.set(\"jwt_token\", jsonData.data.token);",
+                  "    pm.environment.set(\"username\", jsonData.data.username);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Login and receive JWT token. Token is automatically saved to environment variable."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Webhook",
+      "item": [
+        {
+          "name": "Execute Buy Order",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"buy\",\n  \"strategyId\": \"66e858a5-ca3c-4c2c-909c-34c605b3e5c7\",\n  \"password\": \"Admin@9090\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/webhook",
+              "host": ["{{base_url}}"],
+              "path": ["api", "webhook"]
+            },
+            "description": "Simulate TradingView webhook for BUY order"
+          },
+          "response": []
+        },
+        {
+          "name": "Execute Sell Order",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"sell\",\n  \"strategyId\": \"66e858a5-ca3c-4c2c-909c-34c605b3e5c7\",\n  \"password\": \"Admin@9090\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/webhook",
+              "host": ["{{base_url}}"],
+              "path": ["api", "webhook"]
+            },
+            "description": "Simulate TradingView webhook for SELL order"
+          },
+          "response": []
+        },
+        {
+          "name": "Invalid Credentials",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"buy\",\n  \"strategyId\": \"66e858a5-ca3c-4c2c-909c-34c605b3e5c7\",\n  \"password\": \"WrongPassword\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/webhook",
+              "host": ["{{base_url}}"],
+              "path": ["api", "webhook"]
+            },
+            "description": "Test webhook with invalid password (should return 401)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Strategy Management",
+      "item": [
+        {
+          "name": "Get All Strategies",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/strategy",
+              "host": ["{{base_url}}"],
+              "path": ["api", "strategy"]
+            },
+            "description": "Retrieve all trading strategies"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Strategy by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/strategy/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "strategy", "1"]
+            },
+            "description": "Get specific strategy by ID"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Strategy",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"New Test Strategy\",\n  \"password\": \"TestPassword123\",\n  \"configId\": 1,\n  \"userId\": 2,\n  \"description\": \"Test strategy for demo\",\n  \"active\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/strategy",
+              "host": ["{{base_url}}"],
+              "path": ["api", "strategy"]
+            },
+            "description": "Create a new trading strategy"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Strategy",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Strategy Name\",\n  \"password\": \"NewPassword123\",\n  \"configId\": 1,\n  \"userId\": 2,\n  \"description\": \"Updated description\",\n  \"active\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/strategy/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "strategy", "1"]
+            },
+            "description": "Update existing strategy"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Strategy",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/strategy/5",
+              "host": ["{{base_url}}"],
+              "path": ["api", "strategy", "5"]
+            },
+            "description": "Delete strategy by ID"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "User Management",
+      "item": [
+        {
+          "name": "Get All Users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/user",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user"]
+            },
+            "description": "Retrieve all users"
+          },
+          "response": []
+        },
+        {
+          "name": "Get User by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/user/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user", "1"]
+            },
+            "description": "Get specific user by ID"
+          },
+          "response": []
+        },
+        {
+          "name": "Create User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"trader003\",\n  \"email\": \"trader003@example.com\",\n  \"password\": \"securePassword123\",\n  \"role\": \"USER\",\n  \"hyperliquidPrivateKey\": \"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef\",\n  \"hyperliquidAddress\": \"0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb\",\n  \"active\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/user",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user"]
+            },
+            "description": "Create a new user"
+          },
+          "response": []
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"trader001_updated\",\n  \"email\": \"trader001_new@example.com\",\n  \"password\": \"newPassword123\",\n  \"role\": \"USER\",\n  \"hyperliquidPrivateKey\": \"0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890\",\n  \"hyperliquidAddress\": \"0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199\",\n  \"active\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/user/2",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user", "2"]
+            },
+            "description": "Update existing user"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/user/4",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user", "4"]
+            },
+            "description": "Delete user by ID"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Config Management",
+      "item": [
+        {
+          "name": "Get All Configs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/config",
+              "host": ["{{base_url}}"],
+              "path": ["api", "config"]
+            },
+            "description": "Retrieve all trading configurations"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Config by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/config/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "config", "1"]
+            },
+            "description": "Get specific config by ID"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Config",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"MATIC Aggressive Config\",\n  \"asset\": \"MATIC\",\n  \"assetId\": 4,\n  \"lotSize\": 100.0,\n  \"slPercent\": 2.5,\n  \"tpPercent\": 8.0,\n  \"leverage\": 8,\n  \"orderType\": \"LIMIT\",\n  \"timeInForce\": \"Gtc\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/config",
+              "host": ["{{base_url}}"],
+              "path": ["api", "config"]
+            },
+            "description": "Create a new trading configuration"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Config",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"ETH Conservative Config\",\n  \"asset\": \"ETH\",\n  \"assetId\": 1,\n  \"lotSize\": 0.05,\n  \"slPercent\": 1.5,\n  \"tpPercent\": 3.0,\n  \"leverage\": 2,\n  \"orderType\": \"LIMIT\",\n  \"timeInForce\": \"Gtc\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/config/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "config", "1"]
+            },
+            "description": "Update existing config"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Config",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/config/5",
+              "host": ["{{base_url}}"],
+              "path": ["api", "config", "5"]
+            },
+            "description": "Delete config by ID"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "username",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}
