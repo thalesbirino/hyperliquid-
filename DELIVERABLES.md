@@ -282,16 +282,17 @@ When you send a webhook request, you'll see beautiful formatted logs:
 
 ### Database Configuration
 
-**Type:** File-based H2 (persists between restarts)
-**Location:** `./data/hyperliquid-db`
+**Type:** In-Memory H2 Database
 **Access:** http://localhost:8080/h2-console
 
 ### Connection Details
 ```
-JDBC URL: jdbc:h2:file:./data/hyperliquid-db
+JDBC URL: jdbc:h2:mem:hyperliquid-db
 Username: sa
 Password: (leave empty)
 ```
+
+**Note:** Database is reset on each application restart. Seed data is automatically loaded from `data.sql`.
 
 ### Pre-loaded Example Data
 
