@@ -196,9 +196,9 @@ curl -X GET http://localhost:8080/api/strategy \
 **Problem:** Invalid example BCrypt hashes
 **Solution:** Generated valid hashes using BCryptPasswordEncoder
 
-### ✅ Issue 6: Database Lock
-**Problem:** Multiple instances locking database
-**Solution:** Killed background processes and cleaned database files
+### ✅ Issue 6: Database Migration to In-Memory
+**Problem:** File-based database had locking issues with multiple instances
+**Solution:** Migrated to H2 in-memory database (jdbc:h2:mem:hyperliquid-db)
 
 ---
 

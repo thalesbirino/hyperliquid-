@@ -118,11 +118,10 @@ server:
   port: 8081  # or any available port
 ```
 
-### Problem: Database locked
+### Problem: Database issues
 
-**Solution**: Delete the database file and restart:
+**Solution**: The application uses H2 in-memory database which resets automatically on restart. Simply restart the application:
 ```bash
-rm -rf ./data/
 mvn spring-boot:run
 ```
 

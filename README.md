@@ -361,11 +361,7 @@ src/main/java/com/trading/hyperliquid/
 
 ### Database Issues
 
-If H2 database file is corrupted:
-```bash
-rm -rf ./data/hyperliquid-db*
-```
-Restart the application to recreate the database.
+The application uses H2 in-memory database. Data is automatically reset on each restart and repopulated from `data.sql`.
 
 ### JWT Issues
 
