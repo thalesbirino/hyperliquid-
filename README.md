@@ -383,4 +383,4 @@ For issues and questions, please open an issue on GitHub.
 
 ---
 
-**Generated with Claude Code** - Trading Bot POC v1.0.0
+Trading Bot POC v1.0.0
