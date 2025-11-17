@@ -45,6 +45,22 @@ public final class TradingConstants {
     // Hyperliquid API Constants
     public static final int SPOT_ASSET_ID_OFFSET = 10000;
 
+    // Stop-Loss Constants
+    public static final String TPSL_STOP_LOSS = "sl";
+    public static final String TPSL_TAKE_PROFIT = "tp";
+    public static final String GROUPING_NONE = "na";
+    public static final String GROUPING_POSITION_TPSL = "positionTpsl";
+    public static final String GROUPING_NORMAL_TPSL = "normalTpsl";
+
+    // Stop-Loss Validation Constants
+    public static final BigDecimal MIN_SL_PERCENT = new BigDecimal("0.1");
+    public static final BigDecimal MAX_SL_PERCENT = new BigDecimal("50.0");
+    public static final int SL_PRICE_SCALE = 8;
+
+    // Stop-Loss Retry Configuration
+    public static final int SL_MAX_RETRY_ATTEMPTS = 3;
+    public static final long SL_RETRY_DELAY_MS = 1000;
+
     private TradingConstants() {
         throw new AssertionError("TradingConstants class cannot be instantiated");
     }

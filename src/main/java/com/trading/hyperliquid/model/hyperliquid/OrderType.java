@@ -35,4 +35,22 @@ public class OrderType {
         orderType.setLimit(new LimitOrderType(tif));
         return orderType;
     }
+
+    /**
+     * Create trigger order type for stop-loss or take-profit
+     *
+     * @param triggerPrice Price that activates the order
+     * @param tpsl "tp" for take-profit, "sl" for stop-loss
+     * @param isMarket true to execute as market order when triggered
+     * @return OrderType with trigger configuration
+     */
+    public static OrderType trigger(String triggerPrice, String tpsl, boolean isMarket) {
+        OrderType orderType = new OrderType();
+        TriggerOrderType trigger = new TriggerOrderType();
+        trigger.setMarket(isMarket);
+        trigger.setTriggerPx(triggerPrice);
+        trigger.setTpsl(tpsl);
+        orderType.setTrigger(trigger);
+        return orderType;
+    }
 }

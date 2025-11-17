@@ -2,6 +2,7 @@ package com.trading.hyperliquid.service;
 
 import com.trading.hyperliquid.exception.HyperliquidApiException;
 import com.trading.hyperliquid.model.entity.Config;
+import com.trading.hyperliquid.model.entity.OrderExecution;
 import com.trading.hyperliquid.model.entity.User;
 import com.trading.hyperliquid.model.enums.OrderSide;
 import com.trading.hyperliquid.model.hyperliquid.*;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -249,10 +251,247 @@ public class HyperliquidService {
     }
 
     /**
-     * Cancel order (mock implementation)
+     * Place a stop-loss order on Hyperliquid Exchange.
+     * Creates a trigger order that executes when price reaches the stop-loss level.
+     * Supports both position-based (positionTpsl) and order-based (normalTpsl) grouping.
+     *
+     * @param orderSide the side of the PRIMARY order (BUY or SELL) - SL will be opposite
+     * @param assetId the Hyperliquid asset ID
+     * @param stopLossPrice the trigger price for stop-loss
+     * @param size the order size
+     * @param groupingType the grouping type (POSITION_BASED or ORDER_BASED)
+     * @param config the trading configuration
+     * @param user the user placing the order
+     * @return the stop-loss order ID
+     * @throws HyperliquidApiException if stop-loss placement fails
+     */
+    public String placeStopLossOrder(
+            OrderExecution.OrderSide orderSide,
+            Integer assetId,
+            BigDecimal stopLossPrice,
+            BigDecimal size,
+            OrderExecution.StopLossGrouping groupingType,
+            Config config,
+            User user) {
+
+        try {
+            validateStopLossRequest(orderSide, assetId, stopLossPrice, size, user);
+
+            // Determine API endpoint
+            String apiUrl = getApiUrl(user);
+            String accountType = user.getIsTestnet() ? "TESTNET (DEMO)" : "MAINNET (REAL)";
+
+            // Stop-loss order is OPPOSITE side of primary order (to close position)
+            OrderExecution.OrderSide slOrderSide = orderSide.opposite();
+
+            // Format grouping string for Hyperliquid API
+            String grouping = getGroupingString(groupingType);
+
+            // Create trigger order for stop-loss
+            OrderType orderType = OrderType.trigger(
+                    stopLossPrice.toPlainString(),
+                    TradingConstants.TPSL_STOP_LOSS,
+                    true  // isMarket = true (execute as market order when triggered)
+            );
+
+            // Build stop-loss order
+            Order slOrder = slOrderSide.isBuy()
+                    ? Order.limitBuy(
+                            assetId,
+                            stopLossPrice.toPlainString(),
+                            size.toPlainString(),
+                            config.getTimeInForce()
+                    )
+                    : Order.limitSell(
+                            assetId,
+                            stopLossPrice.toPlainString(),
+                            size.toPlainString(),
+                            config.getTimeInForce()
+                    );
+
+            // Override with trigger order type
+            slOrder.setT(orderType);
+
+            // Set reduce-only flag (ensures SL only closes positions, never increases them)
+            slOrder.setR(true);
+
+            // Create order action with grouping
+            OrderAction orderAction = OrderAction.builder()
+                    .type("order")
+                    .orders(List.of(slOrder))
+                    .grouping(grouping)
+                    .build();
+
+            // Generate nonce
+            long nonce = nonceManager.getNextNonce(user.getHyperliquidAddress());
+
+            if (mockMode) {
+                return executeMockStopLoss(orderSide, slOrderSide, assetId, stopLossPrice, size,
+                        groupingType, config, user, nonce, apiUrl, accountType);
+            } else {
+                // Real API call (not implemented in POC)
+                // TODO: Implement real HTTP POST to apiUrl with signed request
+                throw new HyperliquidApiException(ErrorMessages.API_INTEGRATION_NOT_IMPLEMENTED);
+            }
+
+        } catch (Exception e) {
+            logger.error("Failed to place stop-loss order: {}", e.getMessage(), e);
+            throw new HyperliquidApiException("Stop-loss order placement failed: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Mock stop-loss order execution - logs to console instead of making real API call.
+     *
+     * @param primaryOrderSide the side of the primary order
+     * @param slOrderSide the side of the stop-loss order (opposite of primary)
+     * @param assetId the asset ID
+     * @param stopLossPrice the stop-loss trigger price
+     * @param size the order size
+     * @param groupingType the grouping type
+     * @param config the trading configuration
+     * @param user the user placing the order
+     * @param nonce the nonce for the order
+     * @param apiUrl the API endpoint URL
+     * @param accountType the account type string for display
+     * @return the mock stop-loss order ID
+     */
+    private String executeMockStopLoss(
+            OrderExecution.OrderSide primaryOrderSide,
+            OrderExecution.OrderSide slOrderSide,
+            Integer assetId,
+            BigDecimal stopLossPrice,
+            BigDecimal size,
+            OrderExecution.StopLossGrouping groupingType,
+            Config config,
+            User user,
+            long nonce,
+            String apiUrl,
+            String accountType) {
+
+        String slOrderId = TradingConstants.MOCK_ORDER_ID_PREFIX +
+                UUID.randomUUID().toString().substring(0, TradingConstants.MOCK_ORDER_ID_LENGTH);
+
+        String groupingName = groupingType == OrderExecution.StopLossGrouping.POSITION_BASED
+                ? "Position-Based (positionTpsl)"
+                : "Order-Based (normalTpsl)";
+
+        // Log stop-loss order execution
+        logger.info("╔══════════════════════════════════════════════════════════╗");
+        logger.info("║        HYPERLIQUID STOP-LOSS PLACED (MOCK MODE)         ║");
+        logger.info("╠══════════════════════════════════════════════════════════╣");
+        logger.info("║ SL Order ID   : {}", slOrderId);
+        logger.info("║ Primary Side  : {}", primaryOrderSide.getAction().toUpperCase());
+        logger.info("║ SL Side       : {} (OPPOSITE)", slOrderSide.getAction().toUpperCase());
+        logger.info("║ Asset         : {}", config.getAsset());
+        logger.info("║ Asset ID      : {}", assetId);
+        logger.info("║ Size          : {}", size);
+        logger.info("║ Trigger Price : ${}", stopLossPrice);
+        logger.info("║ Order Type    : TRIGGER (Market when triggered)");
+        logger.info("║ Trigger Type  : STOP-LOSS");
+        logger.info("║ Grouping      : {}", groupingName);
+        logger.info("║ Reduce-Only   : true");
+        logger.info("║ Account Type  : {}", accountType);
+        logger.info("║ API Endpoint  : {}", apiUrl);
+        logger.info("║ User          : {}", user.getUsername());
+        logger.info("║ Wallet        : {}", maskAddress(user.getHyperliquidAddress()));
+        logger.info("║ Nonce         : {}", nonce);
+        logger.info("║ Status        : ACTIVE (Waiting for trigger)");
+        logger.info("╚══════════════════════════════════════════════════════════╝");
+
+        return slOrderId;
+    }
+
+    /**
+     * Get grouping string for Hyperliquid API based on grouping type.
+     *
+     * @param groupingType the grouping enum
+     * @return the Hyperliquid API grouping string
+     */
+    private String getGroupingString(OrderExecution.StopLossGrouping groupingType) {
+        return groupingType == OrderExecution.StopLossGrouping.POSITION_BASED
+                ? TradingConstants.GROUPING_POSITION_TPSL
+                : TradingConstants.GROUPING_NORMAL_TPSL;
+    }
+
+    /**
+     * Validate stop-loss order request parameters.
+     *
+     * @param orderSide the primary order side
+     * @param assetId the asset ID
+     * @param stopLossPrice the stop-loss trigger price
+     * @param size the order size
+     * @param user the user placing the order
+     * @throws IllegalArgumentException if any validation fails
+     */
+    private void validateStopLossRequest(
+            OrderExecution.OrderSide orderSide,
+            Integer assetId,
+            BigDecimal stopLossPrice,
+            BigDecimal size,
+            User user) {
+
+        if (orderSide == null) {
+            throw new IllegalArgumentException("Order side is required for stop-loss placement");
+        }
+
+        if (assetId == null) {
+            throw new IllegalArgumentException("Asset ID is required for stop-loss placement");
+        }
+
+        if (stopLossPrice == null || stopLossPrice.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Valid stop-loss price is required");
+        }
+
+        if (size == null || size.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Valid order size is required");
+        }
+
+        if (user == null || user.getHyperliquidAddress() == null) {
+            throw new IllegalArgumentException(ErrorMessages.USER_REQUIRED);
+        }
+    }
+
+    /**
+     * Cancel an order on Hyperliquid Exchange.
+     * Used for cancelling both regular orders and stop-loss orders.
+     *
+     * @param orderId the order ID to cancel (oid from Hyperliquid)
+     * @param assetId the asset ID
+     * @param user the user who placed the order
+     * @throws HyperliquidApiException if cancellation fails
      */
     public void cancelOrder(String orderId, Integer assetId, User user) {
-        logger.info("[HyperliquidService] MOCK: Cancelled order {} for asset {} by user {}",
-                orderId, assetId, user.getUsername());
+        try {
+            // Determine API endpoint
+            String apiUrl = getApiUrl(user);
+            String accountType = user.getIsTestnet() ? "TESTNET (DEMO)" : "MAINNET (REAL)";
+
+            // Generate nonce
+            long nonce = nonceManager.getNextNonce(user.getHyperliquidAddress());
+
+            if (mockMode) {
+                logger.info("╔══════════════════════════════════════════════════════════╗");
+                logger.info("║          HYPERLIQUID ORDER CANCELLED (MOCK MODE)         ║");
+                logger.info("╠══════════════════════════════════════════════════════════╣");
+                logger.info("║ Order ID      : {}", orderId);
+                logger.info("║ Asset ID      : {}", assetId);
+                logger.info("║ Account Type  : {}", accountType);
+                logger.info("║ API Endpoint  : {}", apiUrl);
+                logger.info("║ User          : {}", user.getUsername());
+                logger.info("║ Wallet        : {}", maskAddress(user.getHyperliquidAddress()));
+                logger.info("║ Nonce         : {}", nonce);
+                logger.info("║ Status        : CANCELLED");
+                logger.info("╚══════════════════════════════════════════════════════════╝");
+            } else {
+                // Real API call (not implemented in POC)
+                // TODO: Implement real HTTP POST to apiUrl with cancel action
+                throw new HyperliquidApiException(ErrorMessages.API_INTEGRATION_NOT_IMPLEMENTED);
+            }
+
+        } catch (Exception e) {
+            logger.error("Failed to cancel order {}: {}", orderId, e.getMessage(), e);
+            throw new HyperliquidApiException("Order cancellation failed: " + e.getMessage(), e);
+        }
     }
 }
