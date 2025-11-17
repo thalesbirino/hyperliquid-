@@ -12,6 +12,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+/**
+ * Service for managing user entities.
+ * Handles CRUD operations for users who connect trading strategies to Hyperliquid Exchange.
+ * Stores Hyperliquid wallet credentials and manages testnet/mainnet routing.
+ */
 @Service
 public class UserService {
 
@@ -25,12 +30,24 @@ public class UserService {
         this.passwordEncoder = passwordEncoder;
     }
 
+    /**
+     * Retrieve all users.
+     *
+     * @return list of all users
+     */
     @Transactional(readOnly = true)
     public List<User> getAllUsers() {
         logger.debug("Fetching all users");
         return userRepository.findAll();
     }
 
+    /**
+     * Retrieve a specific user by ID.
+     *
+     * @param id the user ID
+     * @return the user entity
+     * @throws ResourceNotFoundException if user with given ID not found
+     */
     @Transactional(readOnly = true)
     public User getUserById(Long id) {
         logger.debug("Fetching user with id: {}", id);
@@ -38,6 +55,15 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
     }
 
+    /**
+     * Create a new user.
+     * Encrypts the password using BCrypt.
+     * Sets default values for role (USER), active (true), and isTestnet (true).
+     *
+     * @param request the user creation request
+     * @return the created user entity
+     * @throws IllegalArgumentException if username or email already exists
+     */
     @Transactional
     public User createUser(UserRequest request) {
         logger.debug("Creating new user: {}", request.getUsername());
@@ -66,6 +92,17 @@ public class UserService {
         return savedUser;
     }
 
+    /**
+     * Update an existing user.
+     * Only updates fields that are non-null in the request.
+     * Password is only updated if a new password is provided.
+     *
+     * @param id the user ID to update
+     * @param request the user update request
+     * @return the updated user entity
+     * @throws IllegalArgumentException if new username or email already exists
+     * @throws ResourceNotFoundException if user with given ID not found
+     */
     @Transactional
     public User updateUser(Long id, UserRequest request) {
         logger.debug("Updating user with id: {}", id);
@@ -113,6 +150,12 @@ public class UserService {
         return updatedUser;
     }
 
+    /**
+     * Delete a user.
+     *
+     * @param id the user ID to delete
+     * @throws ResourceNotFoundException if user with given ID not found
+     */
     @Transactional
     public void deleteUser(Long id) {
         logger.debug("Deleting user with id: {}", id);

@@ -15,6 +15,10 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Service;
 
+/**
+ * Service for handling user authentication and JWT token generation.
+ * Provides secure login functionality with BCrypt password verification.
+ */
 @Service
 public class AuthService {
 
@@ -38,7 +42,13 @@ public class AuthService {
     }
 
     /**
-     * Authenticate user and generate JWT token
+     * Authenticate user credentials and generate JWT access token.
+     * Verifies username/password combination using Spring Security's AuthenticationManager
+     * and returns a JWT token for subsequent API requests.
+     *
+     * @param request the login request containing username and password
+     * @return JWT response containing token, username, email, and role
+     * @throws InvalidCredentialsException if username/password is incorrect or user not found
      */
     public JwtResponse login(LoginRequest request) {
         try {

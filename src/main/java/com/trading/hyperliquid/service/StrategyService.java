@@ -16,6 +16,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Service for managing trading strategy entities.
+ * Strategies link TradingView webhooks to specific users and trading configurations.
+ * Each strategy has a unique ID and password for webhook authentication.
+ */
 @Service
 public class StrategyService {
 
@@ -38,12 +43,24 @@ public class StrategyService {
         this.passwordEncoder = passwordEncoder;
     }
 
+    /**
+     * Retrieve all trading strategies.
+     *
+     * @return list of all strategies
+     */
     @Transactional(readOnly = true)
     public List<Strategy> getAllStrategies() {
         logger.debug("Fetching all strategies");
         return strategyRepository.findAll();
     }
 
+    /**
+     * Retrieve a specific trading strategy by database ID.
+     *
+     * @param id the strategy database ID
+     * @return the strategy entity
+     * @throws ResourceNotFoundException if strategy with given ID not found
+     */
     @Transactional(readOnly = true)
     public Strategy getStrategyById(Long id) {
         logger.debug("Fetching strategy with id: {}", id);
@@ -51,6 +68,13 @@ public class StrategyService {
                 .orElseThrow(() -> new ResourceNotFoundException("Strategy not found with id: " + id));
     }
 
+    /**
+     * Retrieve a specific trading strategy by TradingView strategy ID (UUID).
+     *
+     * @param strategyId the TradingView strategy ID
+     * @return the strategy entity
+     * @throws ResourceNotFoundException if strategy with given strategyId not found
+     */
     @Transactional(readOnly = true)
     public Strategy getStrategyByStrategyId(String strategyId) {
         logger.debug("Fetching strategy with strategyId: {}", strategyId);
@@ -58,6 +82,17 @@ public class StrategyService {
                 .orElseThrow(() -> new ResourceNotFoundException("Strategy not found with strategyId: " + strategyId));
     }
 
+    /**
+     * Create a new trading strategy.
+     * Generates a UUID for strategyId if not provided.
+     * Encrypts the password using BCrypt.
+     * Sets default values for active (true), inverse (false), and pyramid (false).
+     *
+     * @param request the strategy creation request
+     * @return the created strategy entity
+     * @throws IllegalArgumentException if strategyId already exists
+     * @throws ResourceNotFoundException if config or user not found
+     */
     @Transactional
     public Strategy createStrategy(StrategyRequest request) {
         logger.debug("Creating new strategy: {}", request.getName());
@@ -96,6 +131,17 @@ public class StrategyService {
         return savedStrategy;
     }
 
+    /**
+     * Update an existing trading strategy.
+     * Only updates fields that are non-null in the request.
+     * Password is only updated if a new password is provided.
+     *
+     * @param id the strategy database ID to update
+     * @param request the strategy update request
+     * @return the updated strategy entity
+     * @throws IllegalArgumentException if new strategyId already exists
+     * @throws ResourceNotFoundException if strategy, config, or user not found
+     */
     @Transactional
     public Strategy updateStrategy(Long id, StrategyRequest request) {
         logger.debug("Updating strategy with id: {}", id);
@@ -151,6 +197,12 @@ public class StrategyService {
         return updatedStrategy;
     }
 
+    /**
+     * Delete a trading strategy.
+     *
+     * @param id the strategy database ID to delete
+     * @throws ResourceNotFoundException if strategy with given ID not found
+     */
     @Transactional
     public void deleteStrategy(Long id) {
         logger.debug("Deleting strategy with id: {}", id);
@@ -162,7 +214,14 @@ public class StrategyService {
     }
 
     /**
-     * Validate strategy credentials (for webhook)
+     * Validate strategy credentials for webhook authentication.
+     * Verifies that the strategyId exists, the strategy is active,
+     * and the password matches the stored BCrypt hash.
+     *
+     * @param strategyId the TradingView strategy ID
+     * @param password the plaintext password to verify
+     * @return the validated strategy entity
+     * @throws InvalidStrategyException if strategyId not found, strategy inactive, or password incorrect
      */
     @Transactional(readOnly = true)
     public Strategy validateStrategyCredentials(String strategyId, String password) {
