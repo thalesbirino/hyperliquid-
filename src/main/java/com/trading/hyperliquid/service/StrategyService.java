@@ -7,8 +7,7 @@ import com.trading.hyperliquid.model.entity.Config;
 import com.trading.hyperliquid.model.entity.Strategy;
 import com.trading.hyperliquid.model.entity.User;
 import com.trading.hyperliquid.repository.StrategyRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.trading.hyperliquid.service.base.BaseService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,13 +19,11 @@ import java.util.UUID;
  * Service for managing trading strategy entities.
  * Strategies link TradingView webhooks to specific users and trading configurations.
  * Each strategy has a unique ID and password for webhook authentication.
+ * Extends BaseService for common CRUD operations.
  */
 @Service
-public class StrategyService {
+public class StrategyService extends BaseService<Strategy, Long, StrategyRepository> {
 
-    private static final Logger logger = LoggerFactory.getLogger(StrategyService.class);
-
-    private final StrategyRepository strategyRepository;
     private final ConfigService configService;
     private final UserService userService;
     private final PasswordEncoder passwordEncoder;
@@ -37,7 +34,7 @@ public class StrategyService {
             UserService userService,
             PasswordEncoder passwordEncoder
     ) {
-        this.strategyRepository = strategyRepository;
+        super(strategyRepository, "Strategy");
         this.configService = configService;
         this.userService = userService;
         this.passwordEncoder = passwordEncoder;
@@ -45,27 +42,26 @@ public class StrategyService {
 
     /**
      * Retrieve all trading strategies.
+     * Delegates to base class findAll() method.
      *
      * @return list of all strategies
      */
     @Transactional(readOnly = true)
     public List<Strategy> getAllStrategies() {
-        logger.debug("Fetching all strategies");
-        return strategyRepository.findAll();
+        return findAll();
     }
 
     /**
      * Retrieve a specific trading strategy by database ID.
+     * Delegates to base class findById() method.
      *
      * @param id the strategy database ID
      * @return the strategy entity
-     * @throws ResourceNotFoundException if strategy with given ID not found
+     * @throws com.trading.hyperliquid.exception.ResourceNotFoundException if strategy with given ID not found
      */
     @Transactional(readOnly = true)
     public Strategy getStrategyById(Long id) {
-        logger.debug("Fetching strategy with id: {}", id);
-        return strategyRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Strategy not found with id: " + id));
+        return findById(id);
     }
 
     /**
@@ -78,7 +74,7 @@ public class StrategyService {
     @Transactional(readOnly = true)
     public Strategy getStrategyByStrategyId(String strategyId) {
         logger.debug("Fetching strategy with strategyId: {}", strategyId);
-        return strategyRepository.findByStrategyId(strategyId)
+        return repository.findByStrategyId(strategyId)
                 .orElseThrow(() -> new ResourceNotFoundException("Strategy not found with strategyId: " + strategyId));
     }
 
@@ -104,7 +100,7 @@ public class StrategyService {
         }
 
         // Check if strategyId already exists
-        if (strategyRepository.existsByStrategyId(strategyId)) {
+        if (repository.existsByStrategyId(strategyId)) {
             throw new IllegalArgumentException("Strategy ID already exists: " + strategyId);
         }
 
@@ -124,7 +120,7 @@ public class StrategyService {
         strategy.setInverse(request.getInverse() != null ? request.getInverse() : false);
         strategy.setPyramid(request.getPyramid() != null ? request.getPyramid() : false);
 
-        Strategy savedStrategy = strategyRepository.save(strategy);
+        Strategy savedStrategy = save(strategy);
         logger.info("Created strategy: {} with id: {} and strategyId: {}",
                 savedStrategy.getName(), savedStrategy.getId(), savedStrategy.getStrategyId());
 
@@ -151,7 +147,7 @@ public class StrategyService {
         // Check strategyId uniqueness if changed
         if (request.getStrategyId() != null &&
                 !strategy.getStrategyId().equals(request.getStrategyId()) &&
-                strategyRepository.existsByStrategyId(request.getStrategyId())) {
+                repository.existsByStrategyId(request.getStrategyId())) {
             throw new IllegalArgumentException("Strategy ID already exists: " + request.getStrategyId());
         }
 
@@ -191,7 +187,7 @@ public class StrategyService {
             strategy.setPyramid(request.getPyramid());
         }
 
-        Strategy updatedStrategy = strategyRepository.save(strategy);
+        Strategy updatedStrategy = save(strategy);
         logger.info("Updated strategy: {}", updatedStrategy.getName());
 
         return updatedStrategy;
@@ -199,18 +195,14 @@ public class StrategyService {
 
     /**
      * Delete a trading strategy.
+     * Delegates to base class deleteById() method.
      *
      * @param id the strategy database ID to delete
-     * @throws ResourceNotFoundException if strategy with given ID not found
+     * @throws com.trading.hyperliquid.exception.ResourceNotFoundException if strategy with given ID not found
      */
     @Transactional
     public void deleteStrategy(Long id) {
-        logger.debug("Deleting strategy with id: {}", id);
-
-        Strategy strategy = getStrategyById(id);
-        strategyRepository.delete(strategy);
-
-        logger.info("Deleted strategy: {}", strategy.getName());
+        deleteById(id);
     }
 
     /**
@@ -227,7 +219,7 @@ public class StrategyService {
     public Strategy validateStrategyCredentials(String strategyId, String password) {
         logger.debug("Validating credentials for strategyId: {}", strategyId);
 
-        Strategy strategy = strategyRepository.findByStrategyId(strategyId)
+        Strategy strategy = repository.findByStrategyId(strategyId)
                 .orElseThrow(() -> new InvalidStrategyException("Invalid strategy ID or password"));
 
         if (!strategy.getActive()) {

@@ -1,11 +1,9 @@
 package com.trading.hyperliquid.service;
 
-import com.trading.hyperliquid.exception.ResourceNotFoundException;
 import com.trading.hyperliquid.model.dto.request.ConfigRequest;
 import com.trading.hyperliquid.model.entity.Config;
 import com.trading.hyperliquid.repository.ConfigRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.trading.hyperliquid.service.base.BaseService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,41 +13,37 @@ import java.util.List;
  * Service for managing trading configuration entities.
  * Handles CRUD operations for Config objects which define trading parameters
  * such as asset, lot size, leverage, stop-loss, and take-profit percentages.
+ * Extends BaseService for common CRUD operations.
  */
 @Service
-public class ConfigService {
-
-    private static final Logger logger = LoggerFactory.getLogger(ConfigService.class);
-
-    private final ConfigRepository configRepository;
+public class ConfigService extends BaseService<Config, Long, ConfigRepository> {
 
     public ConfigService(ConfigRepository configRepository) {
-        this.configRepository = configRepository;
+        super(configRepository, "Config");
     }
 
     /**
      * Retrieve all trading configurations.
+     * Delegates to base class findAll() method.
      *
      * @return list of all configs
      */
     @Transactional(readOnly = true)
     public List<Config> getAllConfigs() {
-        logger.debug("Fetching all configs");
-        return configRepository.findAll();
+        return findAll();
     }
 
     /**
      * Retrieve a specific trading configuration by ID.
+     * Delegates to base class findById() method.
      *
      * @param id the config ID
      * @return the config entity
-     * @throws ResourceNotFoundException if config with given ID not found
+     * @throws com.trading.hyperliquid.exception.ResourceNotFoundException if config with given ID not found
      */
     @Transactional(readOnly = true)
     public Config getConfigById(Long id) {
-        logger.debug("Fetching config with id: {}", id);
-        return configRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Config not found with id: " + id));
+        return findById(id);
     }
 
     /**
@@ -75,7 +69,7 @@ public class ConfigService {
         config.setOrderType(request.getOrderType() != null ? request.getOrderType() : Config.OrderType.LIMIT);
         config.setTimeInForce(request.getTimeInForce() != null ? request.getTimeInForce() : "Gtc");
 
-        Config savedConfig = configRepository.save(config);
+        Config savedConfig = save(config);
         logger.info("Created config: {} with id: {}", savedConfig.getName(), savedConfig.getId());
 
         return savedConfig;
@@ -115,7 +109,7 @@ public class ConfigService {
             config.setTimeInForce(request.getTimeInForce());
         }
 
-        Config updatedConfig = configRepository.save(config);
+        Config updatedConfig = save(config);
         logger.info("Updated config: {}", updatedConfig.getName());
 
         return updatedConfig;
@@ -123,17 +117,13 @@ public class ConfigService {
 
     /**
      * Delete a trading configuration.
+     * Delegates to base class deleteById() method.
      *
      * @param id the config ID to delete
-     * @throws ResourceNotFoundException if config with given ID not found
+     * @throws com.trading.hyperliquid.exception.ResourceNotFoundException if config with given ID not found
      */
     @Transactional
     public void deleteConfig(Long id) {
-        logger.debug("Deleting config with id: {}", id);
-
-        Config config = getConfigById(id);
-        configRepository.delete(config);
-
-        logger.info("Deleted config: {}", config.getName());
+        deleteById(id);
     }
 }

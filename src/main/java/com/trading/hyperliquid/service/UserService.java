@@ -1,11 +1,9 @@
 package com.trading.hyperliquid.service;
 
-import com.trading.hyperliquid.exception.ResourceNotFoundException;
 import com.trading.hyperliquid.model.dto.request.UserRequest;
 import com.trading.hyperliquid.model.entity.User;
 import com.trading.hyperliquid.repository.UserRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.trading.hyperliquid.service.base.BaseService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,43 +14,40 @@ import java.util.List;
  * Service for managing user entities.
  * Handles CRUD operations for users who connect trading strategies to Hyperliquid Exchange.
  * Stores Hyperliquid wallet credentials and manages testnet/mainnet routing.
+ * Extends BaseService for common CRUD operations.
  */
 @Service
-public class UserService {
+public class UserService extends BaseService<User, Long, UserRepository> {
 
-    private static final Logger logger = LoggerFactory.getLogger(UserService.class);
-
-    private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
     public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
-        this.userRepository = userRepository;
+        super(userRepository, "User");
         this.passwordEncoder = passwordEncoder;
     }
 
     /**
      * Retrieve all users.
+     * Delegates to base class findAll() method.
      *
      * @return list of all users
      */
     @Transactional(readOnly = true)
     public List<User> getAllUsers() {
-        logger.debug("Fetching all users");
-        return userRepository.findAll();
+        return findAll();
     }
 
     /**
      * Retrieve a specific user by ID.
+     * Delegates to base class findById() method.
      *
      * @param id the user ID
      * @return the user entity
-     * @throws ResourceNotFoundException if user with given ID not found
+     * @throws com.trading.hyperliquid.exception.ResourceNotFoundException if user with given ID not found
      */
     @Transactional(readOnly = true)
     public User getUserById(Long id) {
-        logger.debug("Fetching user with id: {}", id);
-        return userRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
+        return findById(id);
     }
 
     /**
@@ -68,11 +63,11 @@ public class UserService {
     public User createUser(UserRequest request) {
         logger.debug("Creating new user: {}", request.getUsername());
 
-        if (userRepository.existsByUsername(request.getUsername())) {
+        if (repository.existsByUsername(request.getUsername())) {
             throw new IllegalArgumentException("Username already exists: " + request.getUsername());
         }
 
-        if (userRepository.existsByEmail(request.getEmail())) {
+        if (repository.existsByEmail(request.getEmail())) {
             throw new IllegalArgumentException("Email already exists: " + request.getEmail());
         }
 
@@ -86,7 +81,7 @@ public class UserService {
         user.setActive(request.getActive() != null ? request.getActive() : true);
         user.setIsTestnet(request.getIsTestnet() != null ? request.getIsTestnet() : true);
 
-        User savedUser = userRepository.save(user);
+        User savedUser = save(user);
         logger.info("Created user: {} with id: {}", savedUser.getUsername(), savedUser.getId());
 
         return savedUser;
@@ -111,13 +106,13 @@ public class UserService {
 
         // Check username uniqueness if changed
         if (!user.getUsername().equals(request.getUsername()) &&
-                userRepository.existsByUsername(request.getUsername())) {
+                repository.existsByUsername(request.getUsername())) {
             throw new IllegalArgumentException("Username already exists: " + request.getUsername());
         }
 
         // Check email uniqueness if changed
         if (!user.getEmail().equals(request.getEmail()) &&
-                userRepository.existsByEmail(request.getEmail())) {
+                repository.existsByEmail(request.getEmail())) {
             throw new IllegalArgumentException("Email already exists: " + request.getEmail());
         }
 
@@ -144,7 +139,7 @@ public class UserService {
             user.setIsTestnet(request.getIsTestnet());
         }
 
-        User updatedUser = userRepository.save(user);
+        User updatedUser = save(user);
         logger.info("Updated user: {}", updatedUser.getUsername());
 
         return updatedUser;
@@ -152,17 +147,13 @@ public class UserService {
 
     /**
      * Delete a user.
+     * Delegates to base class deleteById() method.
      *
      * @param id the user ID to delete
-     * @throws ResourceNotFoundException if user with given ID not found
+     * @throws com.trading.hyperliquid.exception.ResourceNotFoundException if user with given ID not found
      */
     @Transactional
     public void deleteUser(Long id) {
-        logger.debug("Deleting user with id: {}", id);
-
-        User user = getUserById(id);
-        userRepository.delete(user);
-
-        logger.info("Deleted user: {}", user.getUsername());
+        deleteById(id);
     }
 }
