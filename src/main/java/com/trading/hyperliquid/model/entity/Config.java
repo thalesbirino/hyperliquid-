@@ -1,9 +1,7 @@
 package com.trading.hyperliquid.model.entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -13,6 +11,7 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "configs")
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class Config {
@@ -40,13 +39,16 @@ public class Config {
     private BigDecimal tpPercent; // Take-profit percentage (optional)
 
     @Column(nullable = false)
+    @Builder.Default
     private Integer leverage = 1; // Leverage (1-50)
 
     @Enumerated(EnumType.STRING)
     @Column(name = "order_type", nullable = false, length = 20)
+    @Builder.Default
     private OrderType orderType = OrderType.LIMIT;
 
     @Column(name = "time_in_force", length = 10)
+    @Builder.Default
     private String timeInForce = "Gtc"; // Gtc, Ioc, Alo
 
     @CreationTimestamp

@@ -5,8 +5,8 @@ import com.trading.hyperliquid.model.dto.request.LoginRequest;
 import com.trading.hyperliquid.model.dto.response.JwtResponse;
 import com.trading.hyperliquid.model.entity.User;
 import com.trading.hyperliquid.repository.UserRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -19,27 +19,15 @@ import org.springframework.stereotype.Service;
  * Service for handling user authentication and JWT token generation.
  * Provides secure login functionality with BCrypt password verification.
  */
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class AuthService {
-
-    private static final Logger logger = LoggerFactory.getLogger(AuthService.class);
 
     private final UserRepository userRepository;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
     private final UserDetailsService userDetailsService;
-
-    public AuthService(
-            UserRepository userRepository,
-            JwtService jwtService,
-            AuthenticationManager authenticationManager,
-            UserDetailsService userDetailsService
-    ) {
-        this.userRepository = userRepository;
-        this.jwtService = jwtService;
-        this.authenticationManager = authenticationManager;
-        this.userDetailsService = userDetailsService;
-    }
 
     /**
      * Authenticate user credentials and generate JWT access token.
@@ -70,7 +58,7 @@ public class AuthService {
             User user = userRepository.findByUsername(request.getUsername())
                     .orElseThrow(() -> new InvalidCredentialsException("User not found"));
 
-            logger.info("User {} logged in successfully", request.getUsername());
+            log.info("User {} logged in successfully", request.getUsername());
 
             return new JwtResponse(
                     token,
@@ -80,7 +68,7 @@ public class AuthService {
             );
 
         } catch (BadCredentialsException e) {
-            logger.error("Login failed for user: {}", request.getUsername());
+            log.error("Login failed for user: {}", request.getUsername());
             throw new InvalidCredentialsException("Invalid username or password");
         }
     }

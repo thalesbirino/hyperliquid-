@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,15 +17,12 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/strategy")
+@RequiredArgsConstructor
 @Tag(name = "Strategy Management", description = "CRUD operations for trading strategies")
 @SecurityRequirement(name = "Bearer Authentication")
 public class StrategyController {
 
     private final StrategyService strategyService;
-
-    public StrategyController(StrategyService strategyService) {
-        this.strategyService = strategyService;
-    }
 
     @GetMapping
     @Operation(summary = "Get all strategies", description = "Retrieve list of all trading strategies")

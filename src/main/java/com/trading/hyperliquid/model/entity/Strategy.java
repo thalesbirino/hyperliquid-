@@ -2,9 +2,7 @@ package com.trading.hyperliquid.model.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -16,8 +14,11 @@ import java.util.UUID;
     @Index(name = "idx_strategy_id", columnList = "strategy_id")
 })
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@ToString(exclude = "password")
+@EqualsAndHashCode(exclude = "password")
 public class Strategy {
 
     @Id
@@ -43,12 +44,15 @@ public class Strategy {
     private User user;
 
     @Column(nullable = false)
+    @Builder.Default
     private Boolean active = true;
 
     @Column(nullable = false)
+    @Builder.Default
     private Boolean inverse = false;
 
     @Column(nullable = false)
+    @Builder.Default
     private Boolean pyramid = false;
 
     @Column(length = 500)

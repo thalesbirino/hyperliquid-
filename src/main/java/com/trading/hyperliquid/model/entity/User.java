@@ -2,9 +2,7 @@ package com.trading.hyperliquid.model.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -13,8 +11,11 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "users")
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@ToString(exclude = {"password", "hyperliquidPrivateKey"})
+@EqualsAndHashCode(exclude = {"password", "hyperliquidPrivateKey"})
 public class User {
 
     @Id
@@ -33,6 +34,7 @@ public class User {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
+    @Builder.Default
     private Role role = Role.USER;
 
     @JsonIgnore
@@ -43,9 +45,11 @@ public class User {
     private String hyperliquidAddress; // Wallet address (0x...)
 
     @Column(nullable = false)
+    @Builder.Default
     private Boolean active = true;
 
     @Column(name = "is_testnet", nullable = false)
+    @Builder.Default
     private Boolean isTestnet = true; // true = demo account, false = real account
 
     @CreationTimestamp

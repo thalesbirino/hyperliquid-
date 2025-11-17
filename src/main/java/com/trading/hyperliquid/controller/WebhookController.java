@@ -6,23 +6,19 @@ import com.trading.hyperliquid.service.WebhookService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/webhook")
+@RequiredArgsConstructor
 @Tag(name = "Webhook", description = "TradingView webhook endpoint for order execution")
 public class WebhookController {
 
-    private static final Logger logger = LoggerFactory.getLogger(WebhookController.class);
-
     private final WebhookService webhookService;
-
-    public WebhookController(WebhookService webhookService) {
-        this.webhookService = webhookService;
-    }
 
     @PostMapping
     @Operation(
@@ -30,7 +26,7 @@ public class WebhookController {
             description = "Process webhook from TradingView and execute order on Hyperliquid"
     )
     public ResponseEntity<WebhookResponse> handleWebhook(@Valid @RequestBody WebhookRequest request) {
-        logger.info("Received webhook: action={}, strategyId={}", request.getAction(), request.getStrategyId());
+        log.info("Received webhook: action={}, strategyId={}", request.getAction(), request.getStrategyId());
 
         WebhookResponse response = webhookService.processWebhook(request);
 

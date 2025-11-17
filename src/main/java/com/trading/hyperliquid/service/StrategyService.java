@@ -2,6 +2,7 @@ package com.trading.hyperliquid.service;
 
 import com.trading.hyperliquid.exception.InvalidStrategyException;
 import com.trading.hyperliquid.exception.ResourceNotFoundException;
+import com.trading.hyperliquid.mapper.StrategyMapper;
 import com.trading.hyperliquid.model.dto.request.StrategyRequest;
 import com.trading.hyperliquid.model.entity.Config;
 import com.trading.hyperliquid.model.entity.Strategy;
@@ -13,7 +14,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.UUID;
 
 /**
  * Service for managing trading strategy entities.
@@ -26,17 +26,20 @@ public class StrategyService extends BaseService<Strategy, Long, StrategyReposit
 
     private final ConfigService configService;
     private final UserService userService;
+    private final StrategyMapper strategyMapper;
     private final PasswordEncoder passwordEncoder;
 
     public StrategyService(
             StrategyRepository strategyRepository,
             ConfigService configService,
             UserService userService,
+            StrategyMapper strategyMapper,
             PasswordEncoder passwordEncoder
     ) {
         super(strategyRepository, "Strategy");
         this.configService = configService;
         this.userService = userService;
+        this.strategyMapper = strategyMapper;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -93,33 +96,17 @@ public class StrategyService extends BaseService<Strategy, Long, StrategyReposit
     public Strategy createStrategy(StrategyRequest request) {
         logger.debug("Creating new strategy: {}", request.getName());
 
-        // Generate strategyId if not provided
-        String strategyId = request.getStrategyId();
-        if (strategyId == null || strategyId.isEmpty()) {
-            strategyId = UUID.randomUUID().toString();
-        }
-
-        // Check if strategyId already exists
-        if (repository.existsByStrategyId(strategyId)) {
-            throw new IllegalArgumentException("Strategy ID already exists: " + strategyId);
+        // Check if strategyId already exists (if provided)
+        if (request.getStrategyId() != null && repository.existsByStrategyId(request.getStrategyId())) {
+            throw new IllegalArgumentException("Strategy ID already exists: " + request.getStrategyId());
         }
 
         // Fetch related entities
         Config config = configService.getConfigById(request.getConfigId());
         User user = userService.getUserById(request.getUserId());
 
-        // Create strategy
-        Strategy strategy = new Strategy();
-        strategy.setName(request.getName());
-        strategy.setStrategyId(strategyId);
-        strategy.setPassword(passwordEncoder.encode(request.getPassword()));
-        strategy.setConfig(config);
-        strategy.setUser(user);
-        strategy.setDescription(request.getDescription());
-        strategy.setActive(request.getActive() != null ? request.getActive() : true);
-        strategy.setInverse(request.getInverse() != null ? request.getInverse() : false);
-        strategy.setPyramid(request.getPyramid() != null ? request.getPyramid() : false);
-
+        // Create strategy using mapper
+        Strategy strategy = strategyMapper.toEntity(request, config, user);
         Strategy savedStrategy = save(strategy);
         logger.info("Created strategy: {} with id: {} and strategyId: {}",
                 savedStrategy.getName(), savedStrategy.getId(), savedStrategy.getStrategyId());
@@ -151,42 +138,12 @@ public class StrategyService extends BaseService<Strategy, Long, StrategyReposit
             throw new IllegalArgumentException("Strategy ID already exists: " + request.getStrategyId());
         }
 
-        // Update fields
-        strategy.setName(request.getName());
+        // Fetch related entities if changed
+        Config config = request.getConfigId() != null ? configService.getConfigById(request.getConfigId()) : null;
+        User user = request.getUserId() != null ? userService.getUserById(request.getUserId()) : null;
 
-        if (request.getStrategyId() != null && !request.getStrategyId().isEmpty()) {
-            strategy.setStrategyId(request.getStrategyId());
-        }
-
-        // Only update password if provided
-        if (request.getPassword() != null && !request.getPassword().isEmpty()) {
-            strategy.setPassword(passwordEncoder.encode(request.getPassword()));
-        }
-
-        if (request.getConfigId() != null) {
-            Config config = configService.getConfigById(request.getConfigId());
-            strategy.setConfig(config);
-        }
-
-        if (request.getUserId() != null) {
-            User user = userService.getUserById(request.getUserId());
-            strategy.setUser(user);
-        }
-
-        strategy.setDescription(request.getDescription());
-
-        if (request.getActive() != null) {
-            strategy.setActive(request.getActive());
-        }
-
-        if (request.getInverse() != null) {
-            strategy.setInverse(request.getInverse());
-        }
-
-        if (request.getPyramid() != null) {
-            strategy.setPyramid(request.getPyramid());
-        }
-
+        // Update strategy using mapper
+        strategyMapper.updateEntity(strategy, request, config, user);
         Strategy updatedStrategy = save(strategy);
         logger.info("Updated strategy: {}", updatedStrategy.getName());
 
