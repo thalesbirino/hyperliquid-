@@ -58,6 +58,7 @@ public class UserService {
         user.setHyperliquidPrivateKey(request.getHyperliquidPrivateKey());
         user.setHyperliquidAddress(request.getHyperliquidAddress());
         user.setActive(request.getActive() != null ? request.getActive() : true);
+        user.setIsTestnet(request.getIsTestnet() != null ? request.getIsTestnet() : true);
 
         User savedUser = userRepository.save(user);
         logger.info("Created user: {} with id: {}", savedUser.getUsername(), savedUser.getId());
@@ -100,6 +101,10 @@ public class UserService {
 
         if (request.getActive() != null) {
             user.setActive(request.getActive());
+        }
+
+        if (request.getIsTestnet() != null) {
+            user.setIsTestnet(request.getIsTestnet());
         }
 
         User updatedUser = userRepository.save(user);
