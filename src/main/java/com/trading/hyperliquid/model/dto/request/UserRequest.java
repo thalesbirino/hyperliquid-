@@ -6,10 +6,12 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class UserRequest {
@@ -27,6 +29,7 @@ public class UserRequest {
     @Size(min = 6, message = "Password must be at least 6 characters")
     private String password;
 
+    @Builder.Default
     private User.Role role = User.Role.USER;
 
     @Pattern(regexp = "^(0x)?[0-9a-fA-F]{64}$", message = "Invalid private key format (must be 64 hex characters)")
@@ -35,7 +38,9 @@ public class UserRequest {
     @Pattern(regexp = "^0x[0-9a-fA-F]{40}$", message = "Invalid Ethereum address format")
     private String hyperliquidAddress;
 
+    @Builder.Default
     private Boolean active = true;
 
+    @Builder.Default
     private Boolean isTestnet = true; // true = demo account, false = real account
 }

@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,15 +17,12 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/config")
+@RequiredArgsConstructor
 @Tag(name = "Config Management", description = "CRUD operations for trading configurations")
 @SecurityRequirement(name = "Bearer Authentication")
 public class ConfigController {
 
     private final ConfigService configService;
-
-    public ConfigController(ConfigService configService) {
-        this.configService = configService;
-    }
 
     @GetMapping
     @Operation(summary = "Get all configs", description = "Retrieve list of all trading configurations")

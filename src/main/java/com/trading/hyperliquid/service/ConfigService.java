@@ -1,5 +1,6 @@
 package com.trading.hyperliquid.service;
 
+import com.trading.hyperliquid.mapper.ConfigMapper;
 import com.trading.hyperliquid.model.dto.request.ConfigRequest;
 import com.trading.hyperliquid.model.entity.Config;
 import com.trading.hyperliquid.repository.ConfigRepository;
@@ -18,8 +19,11 @@ import java.util.List;
 @Service
 public class ConfigService extends BaseService<Config, Long, ConfigRepository> {
 
-    public ConfigService(ConfigRepository configRepository) {
+    private final ConfigMapper configMapper;
+
+    public ConfigService(ConfigRepository configRepository, ConfigMapper configMapper) {
         super(configRepository, "Config");
+        this.configMapper = configMapper;
     }
 
     /**
@@ -58,17 +62,7 @@ public class ConfigService extends BaseService<Config, Long, ConfigRepository> {
     public Config createConfig(ConfigRequest request) {
         logger.debug("Creating new config: {}", request.getName());
 
-        Config config = new Config();
-        config.setName(request.getName());
-        config.setAsset(request.getAsset());
-        config.setAssetId(request.getAssetId());
-        config.setLotSize(request.getLotSize());
-        config.setSlPercent(request.getSlPercent());
-        config.setTpPercent(request.getTpPercent());
-        config.setLeverage(request.getLeverage() != null ? request.getLeverage() : 1);
-        config.setOrderType(request.getOrderType() != null ? request.getOrderType() : Config.OrderType.LIMIT);
-        config.setTimeInForce(request.getTimeInForce() != null ? request.getTimeInForce() : "Gtc");
-
+        Config config = configMapper.toEntity(request);
         Config savedConfig = save(config);
         logger.info("Created config: {} with id: {}", savedConfig.getName(), savedConfig.getId());
 
@@ -89,26 +83,7 @@ public class ConfigService extends BaseService<Config, Long, ConfigRepository> {
         logger.debug("Updating config with id: {}", id);
 
         Config config = getConfigById(id);
-
-        config.setName(request.getName());
-        config.setAsset(request.getAsset());
-        config.setAssetId(request.getAssetId());
-        config.setLotSize(request.getLotSize());
-        config.setSlPercent(request.getSlPercent());
-        config.setTpPercent(request.getTpPercent());
-
-        if (request.getLeverage() != null) {
-            config.setLeverage(request.getLeverage());
-        }
-
-        if (request.getOrderType() != null) {
-            config.setOrderType(request.getOrderType());
-        }
-
-        if (request.getTimeInForce() != null) {
-            config.setTimeInForce(request.getTimeInForce());
-        }
-
+        configMapper.updateEntity(config, request);
         Config updatedConfig = save(config);
         logger.info("Updated config: {}", updatedConfig.getName());
 

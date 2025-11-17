@@ -3,12 +3,14 @@ package com.trading.hyperliquid.model.dto.request;
 import com.trading.hyperliquid.model.entity.Config;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class ConfigRequest {
@@ -39,10 +41,13 @@ public class ConfigRequest {
 
     @Min(value = 1, message = "Leverage must be at least 1")
     @Max(value = 50, message = "Leverage must not exceed 50")
+    @Builder.Default
     private Integer leverage = 1;
 
+    @Builder.Default
     private Config.OrderType orderType = Config.OrderType.LIMIT;
 
     @Pattern(regexp = "^(Gtc|Ioc|Alo)$", message = "Time in force must be Gtc, Ioc, or Alo")
+    @Builder.Default
     private String timeInForce = "Gtc";
 }

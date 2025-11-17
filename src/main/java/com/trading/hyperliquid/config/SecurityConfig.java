@@ -2,6 +2,7 @@ package com.trading.hyperliquid.config;
 
 import com.trading.hyperliquid.security.JwtAuthenticationEntryPoint;
 import com.trading.hyperliquid.security.JwtAuthenticationFilter;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -28,21 +29,12 @@ import java.util.List;
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final UserDetailsService userDetailsService;
     private final JwtAuthenticationEntryPoint authenticationEntryPoint;
-
-    public SecurityConfig(
-            JwtAuthenticationFilter jwtAuthFilter,
-            UserDetailsService userDetailsService,
-            JwtAuthenticationEntryPoint authenticationEntryPoint
-    ) {
-        this.jwtAuthFilter = jwtAuthFilter;
-        this.userDetailsService = userDetailsService;
-        this.authenticationEntryPoint = authenticationEntryPoint;
-    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {

@@ -5,30 +5,25 @@ import com.trading.hyperliquid.model.dto.response.WebhookResponse;
 import com.trading.hyperliquid.model.entity.Config;
 import com.trading.hyperliquid.model.entity.Strategy;
 import com.trading.hyperliquid.model.entity.User;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class WebhookService {
-
-    private static final Logger logger = LoggerFactory.getLogger(WebhookService.class);
 
     private final StrategyService strategyService;
     private final HyperliquidService hyperliquidService;
-
-    public WebhookService(StrategyService strategyService, HyperliquidService hyperliquidService) {
-        this.strategyService = strategyService;
-        this.hyperliquidService = hyperliquidService;
-    }
 
     /**
      * Process TradingView webhook and execute order
      */
     @Transactional
     public WebhookResponse processWebhook(WebhookRequest request) {
-        logger.info("Processing webhook - Action: {}, StrategyID: {}", request.getAction(), request.getStrategyId());
+        log.info("Processing webhook - Action: {}, StrategyID: {}", request.getAction(), request.getStrategyId());
 
         try {
             // 1. Validate strategy credentials
@@ -41,7 +36,7 @@ public class WebhookService {
             Config config = strategy.getConfig();
             User user = strategy.getUser();
 
-            logger.debug("Strategy '{}' validated. Asset: {}, User: {}",
+            log.debug("Strategy '{}' validated. Asset: {}, User: {}",
                     strategy.getName(), config.getAsset(), user.getUsername());
 
             // 3. Execute order on Hyperliquid
@@ -58,7 +53,7 @@ public class WebhookService {
             );
 
         } catch (Exception e) {
-            logger.error("Webhook processing failed: {}", e.getMessage(), e);
+            log.error("Webhook processing failed: {}", e.getMessage(), e);
             return WebhookResponse.error("Order execution failed: " + e.getMessage());
         }
     }

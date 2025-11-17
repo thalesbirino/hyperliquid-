@@ -1,10 +1,10 @@
 package com.trading.hyperliquid.service;
 
+import com.trading.hyperliquid.mapper.UserMapper;
 import com.trading.hyperliquid.model.dto.request.UserRequest;
 import com.trading.hyperliquid.model.entity.User;
 import com.trading.hyperliquid.repository.UserRepository;
 import com.trading.hyperliquid.service.base.BaseService;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,11 +19,11 @@ import java.util.List;
 @Service
 public class UserService extends BaseService<User, Long, UserRepository> {
 
-    private final PasswordEncoder passwordEncoder;
+    private final UserMapper userMapper;
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserService(UserRepository userRepository, UserMapper userMapper) {
         super(userRepository, "User");
-        this.passwordEncoder = passwordEncoder;
+        this.userMapper = userMapper;
     }
 
     /**
@@ -71,16 +71,7 @@ public class UserService extends BaseService<User, Long, UserRepository> {
             throw new IllegalArgumentException("Email already exists: " + request.getEmail());
         }
 
-        User user = new User();
-        user.setUsername(request.getUsername());
-        user.setEmail(request.getEmail());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setRole(request.getRole() != null ? request.getRole() : User.Role.USER);
-        user.setHyperliquidPrivateKey(request.getHyperliquidPrivateKey());
-        user.setHyperliquidAddress(request.getHyperliquidAddress());
-        user.setActive(request.getActive() != null ? request.getActive() : true);
-        user.setIsTestnet(request.getIsTestnet() != null ? request.getIsTestnet() : true);
-
+        User user = userMapper.toEntity(request);
         User savedUser = save(user);
         logger.info("Created user: {} with id: {}", savedUser.getUsername(), savedUser.getId());
 
@@ -116,29 +107,7 @@ public class UserService extends BaseService<User, Long, UserRepository> {
             throw new IllegalArgumentException("Email already exists: " + request.getEmail());
         }
 
-        user.setUsername(request.getUsername());
-        user.setEmail(request.getEmail());
-
-        // Only update password if provided
-        if (request.getPassword() != null && !request.getPassword().isEmpty()) {
-            user.setPassword(passwordEncoder.encode(request.getPassword()));
-        }
-
-        if (request.getRole() != null) {
-            user.setRole(request.getRole());
-        }
-
-        user.setHyperliquidPrivateKey(request.getHyperliquidPrivateKey());
-        user.setHyperliquidAddress(request.getHyperliquidAddress());
-
-        if (request.getActive() != null) {
-            user.setActive(request.getActive());
-        }
-
-        if (request.getIsTestnet() != null) {
-            user.setIsTestnet(request.getIsTestnet());
-        }
-
+        userMapper.updateEntity(user, request);
         User updatedUser = save(user);
         logger.info("Updated user: {}", updatedUser.getUsername());
 
