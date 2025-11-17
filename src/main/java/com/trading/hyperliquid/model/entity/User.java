@@ -1,5 +1,6 @@
 package com.trading.hyperliquid.model.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -26,6 +27,7 @@ public class User {
     @Column(nullable = false, unique = true, length = 150)
     private String email;
 
+    @JsonIgnore
     @Column(nullable = false)
     private String password; // BCrypt hashed password for admin login
 
@@ -33,6 +35,7 @@ public class User {
     @Column(nullable = false, length = 20)
     private Role role = Role.USER;
 
+    @JsonIgnore
     @Column(name = "hyperliquid_private_key", length = 66)
     private String hyperliquidPrivateKey; // Wallet private key for signing
 
