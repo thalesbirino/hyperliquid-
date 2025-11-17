@@ -32,4 +32,8 @@ public class StrategyRequest {
     private String description;
 
     private Boolean active = true;
+
+    private Boolean inverse = false;
+
+    private Boolean pyramid = false;
 }

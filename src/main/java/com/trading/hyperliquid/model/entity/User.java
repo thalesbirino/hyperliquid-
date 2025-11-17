@@ -42,6 +42,9 @@ public class User {
     @Column(nullable = false)
     private Boolean active = true;
 
+    @Column(name = "is_testnet", nullable = false)
+    private Boolean isTestnet = true; // true = demo account, false = real account
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

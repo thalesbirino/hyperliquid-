@@ -31,6 +31,11 @@ build/
 .settings/
 .claude/
 
+# AI Assistant Rules (not committed - local development only)
+.cursorrules
+.github/copilot-instructions.md
+CLAUDE.md
+
 # OS
 .DS_Store
 Thumbs.db

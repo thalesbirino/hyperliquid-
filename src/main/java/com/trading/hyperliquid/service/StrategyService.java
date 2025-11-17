@@ -86,6 +86,8 @@ public class StrategyService {
         strategy.setUser(user);
         strategy.setDescription(request.getDescription());
         strategy.setActive(request.getActive() != null ? request.getActive() : true);
+        strategy.setInverse(request.getInverse() != null ? request.getInverse() : false);
+        strategy.setPyramid(request.getPyramid() != null ? request.getPyramid() : false);
 
         Strategy savedStrategy = strategyRepository.save(strategy);
         logger.info("Created strategy: {} with id: {} and strategyId: {}",
@@ -133,6 +135,14 @@ public class StrategyService {
 
         if (request.getActive() != null) {
             strategy.setActive(request.getActive());
+        }
+
+        if (request.getInverse() != null) {
+            strategy.setInverse(request.getInverse());
+        }
+
+        if (request.getPyramid() != null) {
+            strategy.setPyramid(request.getPyramid());
         }
 
         Strategy updatedStrategy = strategyRepository.save(strategy);

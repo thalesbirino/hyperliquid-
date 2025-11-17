@@ -28,9 +28,6 @@ public class HyperliquidService {
     @Value("${hyperliquid.api.mock-mode:true}")
     private boolean mockMode;
 
-    @Value("${hyperliquid.api.use-testnet:true}")
-    private boolean useTestnet;
-
     @Value("${hyperliquid.api.testnet-url}")
     private String testnetUrl;
 
@@ -39,6 +36,16 @@ public class HyperliquidService {
 
     public HyperliquidService(NonceManager nonceManager) {
         this.nonceManager = nonceManager;
+    }
+
+    /**
+     * Get the appropriate API URL based on user's account type
+     *
+     * @param user User with account configuration
+     * @return API URL (testnet or mainnet)
+     */
+    private String getApiUrl(User user) {
+        return user.getIsTestnet() ? testnetUrl : mainnetUrl;
     }
 
     /**
@@ -53,6 +60,11 @@ public class HyperliquidService {
         try {
             // Validate inputs
             validateOrderRequest(action, config, user);
+
+            // Determine API endpoint based on user account type
+            String apiUrl = getApiUrl(user);
+            String accountType = user.getIsTestnet() ? "TESTNET (DEMO)" : "MAINNET (REAL)";
+            logger.debug("Using {} endpoint: {}", accountType, apiUrl);
 
             // Determine buy/sell
             boolean isBuy = action.equalsIgnoreCase("buy");
@@ -87,9 +99,10 @@ public class HyperliquidService {
             // 3. Parse and return actual response
 
             if (mockMode) {
-                return executeMockOrder(action, config, user, mockPrice, order, nonce);
+                return executeMockOrder(action, config, user, mockPrice, order, nonce, apiUrl, accountType);
             } else {
                 // Real API call (not implemented in POC)
+                // TODO: Implement real HTTP POST to apiUrl with signed request
                 throw new HyperliquidApiException("Real API integration not implemented in POC mode");
             }
 
@@ -103,7 +116,8 @@ public class HyperliquidService {
      * Mock order execution - logs to console instead of making real API call
      */
     private String executeMockOrder(String action, Config config, User user,
-                                    BigDecimal price, Order order, long nonce) {
+                                    BigDecimal price, Order order, long nonce,
+                                    String apiUrl, String accountType) {
         String orderId = "MOCK-" + UUID.randomUUID().toString().substring(0, 8);
 
         // Calculate SL/TP prices
@@ -137,6 +151,8 @@ public class HyperliquidService {
         logger.info("║ Leverage      : {}x", config.getLeverage());
         logger.info("║ Order Type    : {}", config.getOrderType());
         logger.info("║ Time In Force : {}", config.getTimeInForce());
+        logger.info("║ Account Type  : {}", accountType);
+        logger.info("║ API Endpoint  : {}", apiUrl);
         if (slPrice != null) {
             logger.info("║ Stop Loss     : ${} ({}%)", slPrice.setScale(2, RoundingMode.HALF_UP), config.getSlPercent());
         }

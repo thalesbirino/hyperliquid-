@@ -36,4 +36,6 @@ public class UserRequest {
     private String hyperliquidAddress;
 
     private Boolean active = true;
+
+    private Boolean isTestnet = true; // true = demo account, false = real account
 }

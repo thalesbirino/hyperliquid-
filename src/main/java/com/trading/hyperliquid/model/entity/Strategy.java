@@ -43,6 +43,12 @@ public class Strategy {
     @Column(nullable = false)
     private Boolean active = true;
 
+    @Column(nullable = false)
+    private Boolean inverse = false;
+
+    @Column(nullable = false)
+    private Boolean pyramid = false;
+
     @Column(length = 500)
     private String description;
 
