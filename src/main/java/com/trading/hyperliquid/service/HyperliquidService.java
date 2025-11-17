@@ -4,7 +4,9 @@ import com.trading.hyperliquid.exception.HyperliquidApiException;
 import com.trading.hyperliquid.model.entity.Config;
 import com.trading.hyperliquid.model.entity.User;
 import com.trading.hyperliquid.model.hyperliquid.*;
+import com.trading.hyperliquid.util.ErrorMessages;
 import com.trading.hyperliquid.util.NonceManager;
+import com.trading.hyperliquid.util.TradingConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -103,12 +105,12 @@ public class HyperliquidService {
             } else {
                 // Real API call (not implemented in POC)
                 // TODO: Implement real HTTP POST to apiUrl with signed request
-                throw new HyperliquidApiException("Real API integration not implemented in POC mode");
+                throw new HyperliquidApiException(ErrorMessages.API_INTEGRATION_NOT_IMPLEMENTED);
             }
 
         } catch (Exception e) {
             logger.error("Failed to place order: {}", e.getMessage(), e);
-            throw new HyperliquidApiException("Failed to place order: " + e.getMessage(), e);
+            throw new HyperliquidApiException(ErrorMessages.ORDER_EXECUTION_FAILED + ": " + e.getMessage(), e);
         }
     }
 
@@ -118,21 +120,30 @@ public class HyperliquidService {
     private String executeMockOrder(String action, Config config, User user,
                                     BigDecimal price, Order order, long nonce,
                                     String apiUrl, String accountType) {
-        String orderId = "MOCK-" + UUID.randomUUID().toString().substring(0, 8);
+        String orderId = TradingConstants.MOCK_ORDER_ID_PREFIX +
+                        UUID.randomUUID().toString().substring(0, TradingConstants.MOCK_ORDER_ID_LENGTH);
 
         // Calculate SL/TP prices
         BigDecimal slPrice = null;
         BigDecimal tpPrice = null;
 
         if (config.getSlPercent() != null) {
-            BigDecimal slMultiplier = config.getSlPercent().divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
+            BigDecimal slMultiplier = config.getSlPercent().divide(
+                BigDecimal.valueOf(TradingConstants.HUNDRED_PERCENT),
+                TradingConstants.PERCENTAGE_SCALE,
+                RoundingMode.HALF_UP
+            );
             slPrice = action.equalsIgnoreCase("buy")
                     ? price.subtract(price.multiply(slMultiplier))
                     : price.add(price.multiply(slMultiplier));
         }
 
         if (config.getTpPercent() != null) {
-            BigDecimal tpMultiplier = config.getTpPercent().divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
+            BigDecimal tpMultiplier = config.getTpPercent().divide(
+                BigDecimal.valueOf(TradingConstants.HUNDRED_PERCENT),
+                TradingConstants.PERCENTAGE_SCALE,
+                RoundingMode.HALF_UP
+            );
             tpPrice = action.equalsIgnoreCase("buy")
                     ? price.add(price.multiply(tpMultiplier))
                     : price.subtract(price.multiply(tpMultiplier));
@@ -154,10 +165,14 @@ public class HyperliquidService {
         logger.info("║ Account Type  : {}", accountType);
         logger.info("║ API Endpoint  : {}", apiUrl);
         if (slPrice != null) {
-            logger.info("║ Stop Loss     : ${} ({}%)", slPrice.setScale(2, RoundingMode.HALF_UP), config.getSlPercent());
+            logger.info("║ Stop Loss     : ${} ({}%)",
+                slPrice.setScale(TradingConstants.PRICE_DISPLAY_SCALE, RoundingMode.HALF_UP),
+                config.getSlPercent());
         }
         if (tpPrice != null) {
-            logger.info("║ Take Profit   : ${} ({}%)", tpPrice.setScale(2, RoundingMode.HALF_UP), config.getTpPercent());
+            logger.info("║ Take Profit   : ${} ({}%)",
+                tpPrice.setScale(TradingConstants.PRICE_DISPLAY_SCALE, RoundingMode.HALF_UP),
+                config.getTpPercent());
         }
         logger.info("║ User          : {}", user.getUsername());
         logger.info("║ Wallet        : {}", maskAddress(user.getHyperliquidAddress()));
@@ -173,12 +188,12 @@ public class HyperliquidService {
      */
     private BigDecimal getMockPrice(String asset) {
         return switch (asset.toUpperCase()) {
-            case "BTC" -> new BigDecimal("45000.00");
-            case "ETH" -> new BigDecimal("2500.00");
-            case "SOL" -> new BigDecimal("110.00");
-            case "AVAX" -> new BigDecimal("35.00");
-            case "MATIC" -> new BigDecimal("0.85");
-            default -> new BigDecimal("100.00");
+            case "BTC" -> TradingConstants.MOCK_BTC_PRICE;
+            case "ETH" -> TradingConstants.MOCK_ETH_PRICE;
+            case "SOL" -> TradingConstants.MOCK_SOL_PRICE;
+            case "AVAX" -> TradingConstants.MOCK_AVAX_PRICE;
+            case "MATIC" -> TradingConstants.MOCK_MATIC_PRICE;
+            default -> TradingConstants.MOCK_DEFAULT_PRICE;
         };
     }
 
@@ -186,10 +201,12 @@ public class HyperliquidService {
      * Mask wallet address for security
      */
     private String maskAddress(String address) {
-        if (address == null || address.length() < 10) {
-            return "****";
+        if (address == null || address.length() < TradingConstants.MIN_ADDRESS_LENGTH) {
+            return TradingConstants.ADDRESS_MASK_FALLBACK;
         }
-        return address.substring(0, 6) + "..." + address.substring(address.length() - 4);
+        return address.substring(0, TradingConstants.ADDRESS_PREFIX_LENGTH) +
+               TradingConstants.ADDRESS_MASK +
+               address.substring(address.length() - TradingConstants.ADDRESS_SUFFIX_LENGTH);
     }
 
     /**
@@ -197,19 +214,19 @@ public class HyperliquidService {
      */
     private void validateOrderRequest(String action, Config config, User user) {
         if (action == null || (!action.equalsIgnoreCase("buy") && !action.equalsIgnoreCase("sell"))) {
-            throw new IllegalArgumentException("Action must be 'buy' or 'sell'");
+            throw new IllegalArgumentException(ErrorMessages.INVALID_ACTION);
         }
 
         if (config == null) {
-            throw new IllegalArgumentException("Config is required");
+            throw new IllegalArgumentException(ErrorMessages.CONFIG_REQUIRED);
         }
 
         if (user == null || user.getHyperliquidAddress() == null) {
-            throw new IllegalArgumentException("User with Hyperliquid address is required");
+            throw new IllegalArgumentException(ErrorMessages.USER_REQUIRED);
         }
 
         if (config.getLotSize().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Lot size must be positive");
+            throw new IllegalArgumentException(ErrorMessages.POSITIVE_LOT_SIZE);
         }
     }
 

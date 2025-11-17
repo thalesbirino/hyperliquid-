@@ -1,5 +1,6 @@
 package com.trading.hyperliquid.model.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -29,6 +30,7 @@ public class Strategy {
     @Column(name = "strategy_id", nullable = false, unique = true, length = 36)
     private String strategyId; // UUID from TradingView
 
+    @JsonIgnore
     @Column(nullable = false)
     private String password; // BCrypt hashed password
 
