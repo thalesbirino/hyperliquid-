@@ -30,8 +30,6 @@ build/
 .project
 .settings/
 .claude/
-
-# AI Assistant Rules (not committed - local development only)
 .cursorrules
 .github/copilot-instructions.md
 CLAUDE.md
