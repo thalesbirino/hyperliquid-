@@ -3,6 +3,7 @@ package com.trading.hyperliquid.service;
 import com.trading.hyperliquid.exception.HyperliquidApiException;
 import com.trading.hyperliquid.model.entity.Config;
 import com.trading.hyperliquid.model.entity.User;
+import com.trading.hyperliquid.model.enums.OrderSide;
 import com.trading.hyperliquid.model.hyperliquid.*;
 import com.trading.hyperliquid.util.ErrorMessages;
 import com.trading.hyperliquid.util.NonceManager;
@@ -51,31 +52,32 @@ public class HyperliquidService {
     }
 
     /**
-     * Place an order on Hyperliquid
+     * Place an order on Hyperliquid Exchange.
+     * Currently in MOCK mode - logs order details to console instead of making real API calls.
      *
-     * @param action Buy or Sell
-     * @param config Trading configuration
-     * @param user User with Hyperliquid credentials
-     * @return Simulated order ID
+     * @param action the order action string ("buy" or "sell")
+     * @param config the trading configuration containing asset, lot size, leverage, and risk management params
+     * @param user the user with Hyperliquid wallet credentials and testnet/mainnet configuration
+     * @return the order ID (mock ID in POC mode, real order ID when integrated with API)
+     * @throws IllegalArgumentException if validation fails (invalid action, missing config, invalid lot size)
+     * @throws HyperliquidApiException if order placement fails
      */
     public String placeOrder(String action, Config config, User user) {
         try {
-            // Validate inputs
-            validateOrderRequest(action, config, user);
+            // Parse and validate order side
+            OrderSide orderSide = OrderSide.fromAction(action);
+            validateOrderRequest(orderSide, config, user);
 
             // Determine API endpoint based on user account type
             String apiUrl = getApiUrl(user);
             String accountType = user.getIsTestnet() ? "TESTNET (DEMO)" : "MAINNET (REAL)";
             logger.debug("Using {} endpoint: {}", accountType, apiUrl);
 
-            // Determine buy/sell
-            boolean isBuy = action.equalsIgnoreCase("buy");
-
             // Create mock price (in real implementation, this would come from market data)
             BigDecimal mockPrice = getMockPrice(config.getAsset());
 
             // Build Hyperliquid order
-            Order order = isBuy
+            Order order = orderSide.isBuy()
                     ? Order.limitBuy(
                             config.getAssetId(),
                             mockPrice.toPlainString(),
@@ -101,7 +103,7 @@ public class HyperliquidService {
             // 3. Parse and return actual response
 
             if (mockMode) {
-                return executeMockOrder(action, config, user, mockPrice, order, nonce, apiUrl, accountType);
+                return executeMockOrder(orderSide, config, user, mockPrice, order, nonce, apiUrl, accountType);
             } else {
                 // Real API call (not implemented in POC)
                 // TODO: Implement real HTTP POST to apiUrl with signed request
@@ -115,9 +117,20 @@ public class HyperliquidService {
     }
 
     /**
-     * Mock order execution - logs to console instead of making real API call
+     * Mock order execution - logs to console instead of making real API call.
+     * Calculates stop-loss and take-profit prices based on configuration.
+     *
+     * @param orderSide the side of the order (BUY or SELL)
+     * @param config the trading configuration
+     * @param user the user placing the order
+     * @param price the order price
+     * @param order the constructed order object
+     * @param nonce the nonce for the order
+     * @param apiUrl the API endpoint URL
+     * @param accountType the account type string for display
+     * @return the mock order ID
      */
-    private String executeMockOrder(String action, Config config, User user,
+    private String executeMockOrder(OrderSide orderSide, Config config, User user,
                                     BigDecimal price, Order order, long nonce,
                                     String apiUrl, String accountType) {
         String orderId = TradingConstants.MOCK_ORDER_ID_PREFIX +
@@ -133,7 +146,7 @@ public class HyperliquidService {
                 TradingConstants.PERCENTAGE_SCALE,
                 RoundingMode.HALF_UP
             );
-            slPrice = action.equalsIgnoreCase("buy")
+            slPrice = orderSide.isBuy()
                     ? price.subtract(price.multiply(slMultiplier))
                     : price.add(price.multiply(slMultiplier));
         }
@@ -144,7 +157,7 @@ public class HyperliquidService {
                 TradingConstants.PERCENTAGE_SCALE,
                 RoundingMode.HALF_UP
             );
-            tpPrice = action.equalsIgnoreCase("buy")
+            tpPrice = orderSide.isBuy()
                     ? price.add(price.multiply(tpMultiplier))
                     : price.subtract(price.multiply(tpMultiplier));
         }
@@ -154,7 +167,7 @@ public class HyperliquidService {
         logger.info("║          HYPERLIQUID ORDER EXECUTED (MOCK MODE)          ║");
         logger.info("╠══════════════════════════════════════════════════════════╣");
         logger.info("║ Order ID      : {}", orderId);
-        logger.info("║ Action        : {}", action.toUpperCase());
+        logger.info("║ Action        : {}", orderSide.getAction().toUpperCase());
         logger.info("║ Asset         : {}", config.getAsset());
         logger.info("║ Asset ID      : {}", config.getAssetId());
         logger.info("║ Size          : {}", config.getLotSize());
@@ -210,10 +223,15 @@ public class HyperliquidService {
     }
 
     /**
-     * Validate order request
+     * Validate order request parameters.
+     *
+     * @param orderSide the order side (BUY or SELL)
+     * @param config the trading configuration
+     * @param user the user placing the order
+     * @throws IllegalArgumentException if any validation fails
      */
-    private void validateOrderRequest(String action, Config config, User user) {
-        if (action == null || (!action.equalsIgnoreCase("buy") && !action.equalsIgnoreCase("sell"))) {
+    private void validateOrderRequest(OrderSide orderSide, Config config, User user) {
+        if (orderSide == null) {
             throw new IllegalArgumentException(ErrorMessages.INVALID_ACTION);
         }
 
