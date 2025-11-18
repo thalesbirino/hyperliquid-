@@ -110,6 +110,13 @@
             <version>${msgpack.version}</version>
         </dependency>
 
+        <!-- OkHttp for HTTP calls to Hyperliquid API -->
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+            <version>4.12.0</version>
+        </dependency>
+
         <!-- Security Test -->
         <dependency>
             <groupId>org.springframework.security</groupId>
