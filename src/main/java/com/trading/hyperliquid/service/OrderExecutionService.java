@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Service for managing order executions and stop-loss tracking.
@@ -214,5 +215,98 @@ public class OrderExecutionService extends BaseService<OrderExecution, Long, Ord
         return repository.findByStopLossOrderId(stopLossOrderId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Order execution not found with stop-loss order ID: " + stopLossOrderId));
+    }
+
+    // ========================================================================
+    // Flowchart Logic Support Methods
+    // ========================================================================
+
+    /**
+     * Check if this is the first order for a strategy
+     * Flowchart: "Is this First Order?"
+     *
+     * @param strategyId Strategy ID
+     * @return true if no orders exist for this strategy
+     */
+    @Transactional(readOnly = true)
+    public boolean isFirstOrder(Long strategyId) {
+        return !repository.existsByStrategyId(strategyId);
+    }
+
+    /**
+     * Get the last order execution for a strategy
+     * Flowchart: "Fetch last order for this particular strategy"
+     *
+     * @param strategyId Strategy ID
+     * @return Optional containing last order, or empty if no orders exist
+     */
+    @Transactional(readOnly = true)
+    public Optional<OrderExecution> getLastOrderByStrategy(Long strategyId) {
+        return repository.findLastOrderByStrategy(strategyId);
+    }
+
+    /**
+     * Get all open positions for a strategy (for pyramid/inverse logic)
+     * Returns positions regardless of stop-loss status
+     *
+     * @param strategyId Strategy ID
+     * @return List of open positions
+     */
+    @Transactional(readOnly = true)
+    public List<OrderExecution> getOpenPositionsByStrategy(Long strategyId) {
+        return repository.findOpenPositionsByStrategy(strategyId);
+    }
+
+    /**
+     * Check if any open positions exist for the same direction as requested side
+     *
+     * @param openPositions List of open positions
+     * @param requestedSide The side of the incoming order
+     * @return true if at least one position exists in the same direction
+     */
+    public boolean hasSameDirectionPosition(List<OrderExecution> openPositions, OrderSide requestedSide) {
+        return openPositions.stream()
+                .anyMatch(position -> position.getOrderSide() == requestedSide);
+    }
+
+    /**
+     * Check if any open positions exist for the opposite direction as requested side
+     *
+     * @param openPositions List of open positions
+     * @param requestedSide The side of the incoming order
+     * @return true if at least one position exists in the opposite direction
+     */
+    public boolean hasOppositeDirectionPosition(List<OrderExecution> openPositions, OrderSide requestedSide) {
+        return openPositions.stream()
+                .anyMatch(position -> position.getOrderSide() != requestedSide);
+    }
+
+    /**
+     * Close all open positions and cancel their stop-loss orders
+     * Used during position reversals (inverse=true)
+     *
+     * @param openPositions List of positions to close
+     */
+    @Transactional
+    public void closeAllPositions(List<OrderExecution> openPositions) {
+        LocalDateTime closedTime = LocalDateTime.now();
+
+        for (OrderExecution position : openPositions) {
+            // Mark position as closed
+            position.setClosedAt(closedTime);
+
+            // Cancel stop-loss if it's active
+            if (position.getStopLossStatus() == StopLossStatus.ACTIVE) {
+                position.setStopLossStatus(StopLossStatus.CANCELLED);
+                position.setStopLossCancelledAt(closedTime);
+            }
+
+            save(position);
+
+            log.info("Closed position {} with order side {} (stop-loss: {})",
+                    position.getId(), position.getOrderSide(), position.getStopLossStatus());
+        }
+
+        log.info("Closed {} positions for position reversal", openPositions.size());
     }
 }

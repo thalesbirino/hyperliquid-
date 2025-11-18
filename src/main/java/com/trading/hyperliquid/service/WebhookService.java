@@ -14,6 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -25,42 +27,224 @@ public class WebhookService {
     private final OrderExecutionService orderExecutionService;
 
     /**
-     * Process TradingView webhook and execute order with automatic stop-loss placement.
+     * Process TradingView webhook and execute order following flowchart logic.
      *
-     * Flow:
-     * 1. Validate strategy credentials
-     * 2. Place primary order on Hyperliquid
-     * 3. Create OrderExecution record
-     * 4. Calculate and place stop-loss order (if slPercent configured)
-     * 5. Update OrderExecution with stop-loss details
+     * Flowchart Decision Tree:
+     * 1. Fetch last order for strategy
+     * 2. Is this First Order? → Yes: Place order and exit
+     * 3. Is Previous Position Closed? → Yes: Place new order and exit
+     * 4. Check prev order action vs current action:
+     *    - Same action → Pyramid=TRUE? → Yes: Allow / No: Reject
+     *    - Opp action → Cancel SL → Square off → Inverse=TRUE? → Yes: Place opposite / No: Just close
      */
     @Transactional
     public WebhookResponse processWebhook(WebhookRequest request) {
         log.info("Processing webhook - Action: {}, StrategyID: {}", request.getAction(), request.getStrategyId());
 
         try {
-            // 1. Validate strategy credentials
+            // ================================================================
+            // STEP 1: Validate strategy credentials
+            // ================================================================
             Strategy strategy = strategyService.validateStrategyCredentials(
                     request.getStrategyId(),
                     request.getPassword()
             );
 
-            // 2. Get associated config and user
             Config config = strategy.getConfig();
             User user = strategy.getUser();
+            OrderExecution.OrderSide requestedSide = OrderExecution.OrderSide.fromAction(request.getAction());
 
-            log.debug("Strategy '{}' validated. Asset: {}, User: {}",
-                    strategy.getName(), config.getAsset(), user.getUsername());
+            log.info("Strategy '{}' validated. Requested action: {}, Pyramid: {}, Inverse: {}",
+                    strategy.getName(), request.getAction(), strategy.getPyramid(), strategy.getInverse());
 
-            // 3. Execute primary order on Hyperliquid
+            // ================================================================
+            // FLOWCHART: Fetch last order for this particular strategy
+            // ================================================================
+            Optional<OrderExecution> lastOrderOpt = orderExecutionService.getLastOrderByStrategy(strategy.getId());
+
+            // ================================================================
+            // FLOWCHART DECISION 1: Is this First Order?
+            // ================================================================
+            if (lastOrderOpt.isEmpty()) {
+                log.info("FLOWCHART PATH: First order for strategy - placing immediately");
+                return placeOrderAndReturnResponse(request, strategy, config, user, requestedSide);
+            }
+
+            OrderExecution lastOrder = lastOrderOpt.get();
+            log.debug("Last order found: ID={}, Side={}, ClosedAt={}",
+                    lastOrder.getId(), lastOrder.getOrderSide(), lastOrder.getClosedAt());
+
+            // ================================================================
+            // FLOWCHART DECISION 2: Is Previous Position Closed?
+            // ================================================================
+            if (lastOrder.getClosedAt() != null) {
+                log.info("FLOWCHART PATH: Previous position closed - placing new order");
+                return placeOrderAndReturnResponse(request, strategy, config, user, requestedSide);
+            }
+
+            // ================================================================
+            // FLOWCHART DECISION 3: Check prev order action and current action
+            // ================================================================
+            OrderExecution.OrderSide lastOrderSide = lastOrder.getOrderSide();
+            boolean isSameDirection = (lastOrderSide == requestedSide);
+
+            OrderPlacementContext context = OrderPlacementContext.from(
+                    request, strategy, requestedSide, lastOrderSide);
+
+            if (isSameDirection) {
+                return handleSameDirectionOrder(context);
+            } else {
+                return handleOppositeDirectionOrder(context);
+            }
+
+        } catch (Exception e) {
+            log.error("Webhook processing failed: {}", e.getMessage(), e);
+            return WebhookResponse.error("Order execution failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Handle same direction order (pyramid logic).
+     * FLOWCHART DECISION 4: Pyramid = TRUE?
+     *
+     * @param context Order placement context
+     * @return WebhookResponse
+     */
+    private WebhookResponse handleSameDirectionOrder(OrderPlacementContext context) {
+
+        log.debug("FLOWCHART PATH: Same direction detected ({} == {})",
+                context.getLastOrderSide(), context.getRequestedSide());
+
+        // ================================================================
+        // FLOWCHART DECISION 4: Pyramid = TRUE?
+        // ================================================================
+        if (context.getStrategy().getPyramid()) {
+            log.info("FLOWCHART PATH: Pyramid=TRUE - allowing add-on order (same direction)");
+            return placeOrderAndReturnResponse(
+                    context.getRequest(),
+                    context.getStrategy(),
+                    context.getConfig(),
+                    context.getUser(),
+                    context.getRequestedSide());
+        } else {
+            log.warn("FLOWCHART PATH: Pyramid=FALSE - rejecting order (same direction not allowed)");
+            return WebhookResponse.error(
+                    "Cannot add to existing position (Pyramid=FALSE). " +
+                    "Enable pyramid flag to allow multiple positions in same direction."
+            );
+        }
+    }
+
+    /**
+     * Handle opposite direction order (inverse logic).
+     * Steps: Cancel SL → Square off → Check inverse flag
+     *
+     * @param context Order placement context
+     * @return WebhookResponse
+     */
+    private WebhookResponse handleOppositeDirectionOrder(OrderPlacementContext context) {
+
+        log.info("FLOWCHART PATH: Opposite direction detected ({} vs {})",
+                context.getLastOrderSide(), context.getRequestedSide());
+
+        // ================================================================
+        // FLOWCHART CRITICAL STEP: Cancel Pending SL Orders (RED HIGHLIGHT)
+        // ================================================================
+        List<OrderExecution> openPositions = orderExecutionService
+                .getOpenPositionsByStrategy(context.getStrategy().getId());
+        cancelPendingStopLossOrders(openPositions, context.getConfig(), context.getUser());
+
+        // ================================================================
+        // FLOWCHART: Square off position (Close all open orders)
+        // ================================================================
+        orderExecutionService.closeAllPositions(openPositions);
+        log.info("Squared off {} positions", openPositions.size());
+
+        // ================================================================
+        // FLOWCHART DECISION 5: Inverse = TRUE?
+        // ================================================================
+        if (context.getStrategy().getInverse()) {
+            log.info("FLOWCHART PATH: Inverse=TRUE - placing new order in opposite direction");
+            return placeOrderAndReturnResponse(
+                    context.getRequest(),
+                    context.getStrategy(),
+                    context.getConfig(),
+                    context.getUser(),
+                    context.getRequestedSide());
+        } else {
+            log.info("FLOWCHART PATH: Inverse=FALSE - marked closed, NO new position");
+            return WebhookResponse.success(
+                    "CLOSED",
+                    context.getRequest().getAction().toUpperCase(),
+                    context.getConfig().getAsset(),
+                    "0",
+                    "0",
+                    "Position closed (Inverse=FALSE). No opposite order placed."
+            );
+        }
+    }
+
+    /**
+     * Cancel all active stop-loss orders for open positions.
+     * This is a critical step before position reversal (highlighted in RED on flowchart).
+     *
+     * @param openPositions List of open positions
+     * @param config Config entity
+     * @param user User entity
+     */
+    private void cancelPendingStopLossOrders(
+            List<OrderExecution> openPositions,
+            Config config,
+            User user) {
+
+        log.info("Cancelling {} pending SL orders before square-off", openPositions.size());
+
+        for (OrderExecution position : openPositions) {
+            if (position.getStopLossStatus() == OrderExecution.StopLossStatus.ACTIVE &&
+                position.getStopLossOrderId() != null) {
+                try {
+                    hyperliquidService.cancelOrder(
+                            position.getStopLossOrderId(),
+                            config.getAssetId(),
+                            user
+                    );
+                    log.info("Cancelled SL order: {}", position.getStopLossOrderId());
+                } catch (Exception e) {
+                    log.error("Failed to cancel SL order {}: {}",
+                            position.getStopLossOrderId(), e.getMessage());
+                    // Continue - don't fail the entire operation
+                }
+            }
+        }
+    }
+
+    /**
+     * Helper method to place order and return response.
+     * This encapsulates the common flow: place order → create execution → place SL → return response
+     *
+     * @param request Webhook request
+     * @param strategy Strategy entity
+     * @param config Config entity
+     * @param user User entity
+     * @param orderSide Side of the order (BUY/SELL)
+     * @return WebhookResponse
+     */
+    private WebhookResponse placeOrderAndReturnResponse(
+            WebhookRequest request,
+            Strategy strategy,
+            Config config,
+            User user,
+            OrderExecution.OrderSide orderSide) {
+
+        try {
+            // 1. Place primary order on Hyperliquid
             String orderId = hyperliquidService.placeOrder(request.getAction(), config, user);
-            log.info("Primary order placed successfully. Order ID: {}", orderId);
+            log.info("Primary order placed. Order ID: {}", orderId);
 
-            // 4. Determine order side and get fill price
-            OrderExecution.OrderSide orderSide = OrderExecution.OrderSide.fromAction(request.getAction());
-            BigDecimal fillPrice = getMockPrice(config.getAsset()); // In real implementation, get from order response
+            // 2. Get fill price (mock for POC)
+            BigDecimal fillPrice = getMockPrice(config.getAsset());
 
-            // 5. Create OrderExecution record
+            // 3. Create OrderExecution record
             OrderExecution execution = orderExecutionService.createOrderExecution(
                     orderId,
                     orderSide,
@@ -69,74 +253,90 @@ public class WebhookService {
                     strategy,
                     user
             );
-            log.info("OrderExecution record created. Execution ID: {}", execution.getId());
+            log.info("OrderExecution created. ID: {}", execution.getId());
 
-            // 6. Place stop-loss order if configured
-            String stopLossOrderId = null;
-            BigDecimal stopLossPrice = null;
+            // 4. Place stop-loss order if configured
+            String stopLossOrderId = placeStopLossIfConfigured(execution, orderSide, fillPrice, config, user);
 
-            if (config.getSlPercent() != null && config.getSlPercent().compareTo(BigDecimal.ZERO) > 0) {
-                try {
-                    // Calculate stop-loss price
-                    stopLossPrice = calculateStopLossPrice(fillPrice, orderSide, config.getSlPercent());
-
-                    log.info("Placing stop-loss order. Price: {}, Percentage: {}%",
-                            stopLossPrice, config.getSlPercent());
-
-                    // Place stop-loss order with position-based grouping (as requested by user)
-                    stopLossOrderId = hyperliquidService.placeStopLossOrder(
-                            orderSide,
-                            config.getAssetId(),
-                            stopLossPrice,
-                            config.getLotSize(),
-                            OrderExecution.StopLossGrouping.POSITION_BASED, // Using option 1 as requested
-                            config,
-                            user
-                    );
-
-                    // Update OrderExecution with stop-loss details
-                    orderExecutionService.updateStopLossOrder(
-                            execution.getId(),
-                            stopLossOrderId,
-                            stopLossPrice,
-                            OrderExecution.StopLossGrouping.POSITION_BASED,
-                            OrderExecution.StopLossStatus.ACTIVE
-                    );
-
-                    log.info("Stop-loss order placed successfully. SL Order ID: {}", stopLossOrderId);
-
-                } catch (Exception slException) {
-                    log.error("Failed to place stop-loss order: {}", slException.getMessage(), slException);
-
-                    // Update execution with failed status
-                    orderExecutionService.updateStopLossOrder(
-                            execution.getId(),
-                            null,
-                            stopLossPrice,
-                            OrderExecution.StopLossGrouping.POSITION_BASED,
-                            OrderExecution.StopLossStatus.FAILED
-                    );
-
-                    // Don't fail the entire webhook - primary order was successful
-                    log.warn("Primary order executed but stop-loss placement failed. Manual intervention may be required.");
-                }
-            } else {
-                log.debug("Stop-loss not configured for this strategy (slPercent is null or zero)");
-            }
-
-            // 7. Build and return success response
+            // 5. Return success response
             return WebhookResponse.success(
                     orderId,
                     request.getAction().toUpperCase(),
                     config.getAsset(),
                     config.getLotSize().toPlainString(),
                     fillPrice.toPlainString(),
-                    "EXECUTED" + (stopLossOrderId != null ? " (Stop-Loss Active)" : "")
+                    "EXECUTED" + (stopLossOrderId != null ? " (SL Active)" : "")
             );
 
         } catch (Exception e) {
-            log.error("Webhook processing failed: {}", e.getMessage(), e);
-            return WebhookResponse.error("Order execution failed: " + e.getMessage());
+            log.error("Failed to place order: {}", e.getMessage(), e);
+            throw new RuntimeException("Order placement failed: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Place stop-loss order if configured in the config.
+     * Returns the stop-loss order ID if successful, null otherwise.
+     *
+     * @param execution Order execution record
+     * @param orderSide Order side (BUY/SELL)
+     * @param fillPrice Fill price of the primary order
+     * @param config Config entity
+     * @param user User entity
+     * @return Stop-loss order ID or null
+     */
+    private String placeStopLossIfConfigured(
+            OrderExecution execution,
+            OrderExecution.OrderSide orderSide,
+            BigDecimal fillPrice,
+            Config config,
+            User user) {
+
+        if (config.getSlPercent() == null || config.getSlPercent().compareTo(BigDecimal.ZERO) <= 0) {
+            return null;
+        }
+
+        BigDecimal stopLossPrice = null;
+        try {
+            stopLossPrice = calculateStopLossPrice(fillPrice, orderSide, config.getSlPercent());
+
+            log.info("Placing SL order. Price: {}, Percentage: {}%",
+                    stopLossPrice, config.getSlPercent());
+
+            String stopLossOrderId = hyperliquidService.placeStopLossOrder(
+                    orderSide,
+                    config.getAssetId(),
+                    stopLossPrice,
+                    config.getLotSize(),
+                    OrderExecution.StopLossGrouping.POSITION_BASED,
+                    config,
+                    user
+            );
+
+            orderExecutionService.updateStopLossOrder(
+                    execution.getId(),
+                    stopLossOrderId,
+                    stopLossPrice,
+                    OrderExecution.StopLossGrouping.POSITION_BASED,
+                    OrderExecution.StopLossStatus.ACTIVE
+            );
+
+            log.info("SL order placed. SL Order ID: {}", stopLossOrderId);
+            return stopLossOrderId;
+
+        } catch (Exception slException) {
+            log.error("Failed to place SL: {}", slException.getMessage(), slException);
+
+            orderExecutionService.updateStopLossOrder(
+                    execution.getId(),
+                    null,
+                    stopLossPrice,
+                    OrderExecution.StopLossGrouping.POSITION_BASED,
+                    OrderExecution.StopLossStatus.FAILED
+            );
+
+            log.warn("Primary order executed but SL placement failed");
+            return null;
         }
     }
 
