@@ -5,13 +5,15 @@ A Spring Boot POC that receives JSON webhooks from TradingView Pine Script strat
 ## Features
 
 - **TradingView Webhook Integration**: Receives and processes webhooks from TradingView strategies
+- **Real Hyperliquid API Integration**: Full EIP-712 signing and HTTP client implementation
 - **Strategy Management**: Create and manage trading strategies with credentials
 - **User Management**: Manage users with Hyperliquid wallet integration
 - **Config Management**: Define trading configurations (asset, lot size, SL/TP, leverage)
 - **JWT Authentication**: Secure admin endpoints with JWT tokens
-- **Mock Order Execution**: Console logging for POC (easily switchable to real API)
+- **Mock & Real Modes**: Switch between simulation and real trading via configuration
 - **Swagger UI**: Interactive API documentation
 - **H2 Database**: In-memory database with seed data
+- **Production Ready**: Complete deployment infrastructure with environment variables
 
 ## Tech Stack
 
@@ -22,7 +24,8 @@ A Spring Boot POC that receives JSON webhooks from TradingView Pine Script strat
 - **Spring Security** (JWT)
 - **Lombok**
 - **Swagger/OpenAPI**
-- **Web3j** (for Hyperliquid signing)
+- **Web3j 4.10.3** (EIP-712 signing for Hyperliquid authentication)
+- **OkHttp 4.12.0** (HTTP client for API calls)
 - **MessagePack** (for Hyperliquid API)
 
 ## Prerequisites
@@ -327,15 +330,62 @@ jwt:
 
 ## Switching to Real Hyperliquid API
 
-1. Set `hyperliquid.api.mock-mode: false` in application.yml
-2. Configure real Hyperliquid private keys for users
-3. Implement `HyperliquidSignerService` for EIP-712 signing
-4. Update `HyperliquidService.placeOrder()` to make real HTTP calls
+The system now has **complete real API integration** implemented. To switch from MOCK to REAL mode:
+
+### Option 1: Using Environment Variables (Recommended for Production)
+
+```bash
+export HYPERLIQUID_MOCK_MODE=false
+export HYPERLIQUID_USE_TESTNET=true  # Start with testnet
+export JWT_SECRET="your-secure-jwt-secret"
+mvn spring-boot:run -Dspring-boot.run.profiles=prod
+```
+
+### Option 2: Update application.yml
+
+```yaml
+hyperliquid:
+  api:
+    mock-mode: false
+    use-testnet: true
+```
+
+### Required Steps:
+
+1. **Get Hyperliquid Credentials**:
+   - Testnet: https://app.hyperliquid-testnet.xyz/
+   - Mainnet: https://app.hyperliquid.xyz/
+   - You need: wallet address + private key
+
+2. **Update User Database**:
+```sql
+UPDATE users SET
+  hyperliquid_private_key = '0xYOUR_PRIVATE_KEY',
+  hyperliquid_address = '0xYOUR_ADDRESS',
+  is_testnet = true
+WHERE username = 'trader001';
+```
+
+3. **Run Application**:
+```bash
+mvn spring-boot:run -Dspring-boot.run.profiles=prod
+```
+
+### Real API Components Implemented:
+
+- **HyperliquidSigner**: EIP-712 signature generation
+- **HyperliquidHttpClient**: HTTP client with OkHttp
+- **HyperliquidRealApiClient**: Complete order placement and cancellation
+- **Production Configuration**: Environment variable support
 
 ## Project Structure
 
 ```
 src/main/java/com/trading/hyperliquid/
+├── client/                 # Hyperliquid API clients
+│   ├── HyperliquidSigner.java       # EIP-712 signing
+│   ├── HyperliquidHttpClient.java   # HTTP communication
+│   └── HyperliquidRealApiClient.java # Main API orchestrator
 ├── config/                  # Configuration classes
 ├── controller/              # REST controllers
 ├── exception/               # Custom exceptions
