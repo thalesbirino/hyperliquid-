@@ -1,5 +1,6 @@
 package com.trading.hyperliquid.service;
 
+import com.trading.hyperliquid.client.HyperliquidRealApiClient;
 import com.trading.hyperliquid.exception.HyperliquidApiException;
 import com.trading.hyperliquid.model.entity.Config;
 import com.trading.hyperliquid.model.entity.OrderExecution;
@@ -11,6 +12,7 @@ import com.trading.hyperliquid.util.NonceManager;
 import com.trading.hyperliquid.util.TradingConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -21,7 +23,7 @@ import java.util.UUID;
 
 /**
  * Service for interacting with Hyperliquid API.
- * Currently in MOCK mode for POC - logs orders to console instead of making real API calls.
+ * Supports both MOCK mode (simulation) and REAL mode (actual API calls).
  */
 @Service
 public class HyperliquidService {
@@ -29,6 +31,9 @@ public class HyperliquidService {
     private static final Logger logger = LoggerFactory.getLogger(HyperliquidService.class);
 
     private final NonceManager nonceManager;
+
+    @Autowired(required = false)
+    private HyperliquidRealApiClient realApiClient;
 
     @Value("${hyperliquid.api.mock-mode:true}")
     private boolean mockMode;
@@ -107,9 +112,12 @@ public class HyperliquidService {
             if (mockMode) {
                 return executeMockOrder(orderSide, config, user, mockPrice, order, nonce, apiUrl, accountType);
             } else {
-                // Real API call (not implemented in POC)
-                // TODO: Implement real HTTP POST to apiUrl with signed request
-                throw new HyperliquidApiException(ErrorMessages.API_INTEGRATION_NOT_IMPLEMENTED);
+                // Real API call to Hyperliquid
+                if (realApiClient == null) {
+                    throw new HyperliquidApiException("Real API client not initialized. Check application configuration.");
+                }
+                logger.info("🚀 REAL MODE: Placing order via Hyperliquid API");
+                return realApiClient.placeOrder(user, order, "na", apiUrl);
             }
 
         } catch (Exception e) {
@@ -284,9 +292,6 @@ public class HyperliquidService {
             // Stop-loss order is OPPOSITE side of primary order (to close position)
             OrderExecution.OrderSide slOrderSide = orderSide.opposite();
 
-            // Format grouping string for Hyperliquid API
-            String grouping = getGroupingString(groupingType);
-
             // Create trigger order for stop-loss
             OrderType orderType = OrderType.trigger(
                     stopLossPrice.toPlainString(),
@@ -315,6 +320,9 @@ public class HyperliquidService {
             // Set reduce-only flag (ensures SL only closes positions, never increases them)
             slOrder.setR(true);
 
+            // Format grouping string for Hyperliquid API
+            String grouping = getGroupingString(groupingType);
+
             // Create order action with grouping
             OrderAction orderAction = OrderAction.builder()
                     .type("order")
@@ -329,9 +337,12 @@ public class HyperliquidService {
                 return executeMockStopLoss(orderSide, slOrderSide, assetId, stopLossPrice, size,
                         groupingType, config, user, nonce, apiUrl, accountType);
             } else {
-                // Real API call (not implemented in POC)
-                // TODO: Implement real HTTP POST to apiUrl with signed request
-                throw new HyperliquidApiException(ErrorMessages.API_INTEGRATION_NOT_IMPLEMENTED);
+                // Real API call to Hyperliquid with stop-loss
+                if (realApiClient == null) {
+                    throw new HyperliquidApiException("Real API client not initialized. Check application configuration.");
+                }
+                logger.info("🛡️ REAL MODE: Placing stop-loss order via Hyperliquid API");
+                return realApiClient.placeOrder(user, slOrder, grouping, apiUrl);
             }
 
         } catch (Exception e) {
