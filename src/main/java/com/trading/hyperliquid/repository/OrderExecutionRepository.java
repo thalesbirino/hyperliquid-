@@ -38,6 +38,17 @@ public interface OrderExecutionRepository extends JpaRepository<OrderExecution, 
     List<OrderExecution> findActiveOrdersByStrategy(@Param("strategyId") Long strategyId);
 
     /**
+     * Find all open positions for a strategy (for pyramid/inverse logic)
+     * Open = FILLED or PARTIALLY_FILLED and not yet closed (regardless of stop-loss status)
+     * This is used to check existing positions before placing new orders
+     */
+    @Query("SELECT oe FROM OrderExecution oe WHERE oe.strategy.id = :strategyId " +
+           "AND oe.status IN ('FILLED', 'PARTIALLY_FILLED') " +
+           "AND oe.closedAt IS NULL " +
+           "ORDER BY oe.executedAt DESC")
+    List<OrderExecution> findOpenPositionsByStrategy(@Param("strategyId") Long strategyId);
+
+    /**
      * Find all open positions for a user
      */
     @Query("SELECT oe FROM OrderExecution oe WHERE oe.user.id = :userId " +
@@ -84,4 +95,19 @@ public interface OrderExecutionRepository extends JpaRepository<OrderExecution, 
             @Param("userId") Long userId,
             @Param("strategyId") Long strategyId
     );
+
+    /**
+     * Find the last order execution for a strategy (most recent by executedAt)
+     * Used for flowchart logic: "Fetch last order for this particular strategy"
+     */
+    @Query("SELECT oe FROM OrderExecution oe WHERE oe.strategy.id = :strategyId " +
+           "ORDER BY oe.executedAt DESC LIMIT 1")
+    Optional<OrderExecution> findLastOrderByStrategy(@Param("strategyId") Long strategyId);
+
+    /**
+     * Check if any order exists for a strategy
+     * Used for flowchart logic: "Is this First Order?"
+     */
+    @Query("SELECT COUNT(oe) > 0 FROM OrderExecution oe WHERE oe.strategy.id = :strategyId")
+    boolean existsByStrategyId(@Param("strategyId") Long strategyId);
 }

@@ -18,9 +18,17 @@ VALUES
     ('AVAX Swing Trade Config', 'AVAX', 3, 2.5, 2.50, 7.50, 3, 'LIMIT', 'Gtc', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 -- Insert Strategies (password is BCrypt hashed "Admin@9090")
+-- Testing all 4 modes: pyramid and inverse combinations
 INSERT INTO strategies (name, strategy_id, password, config_id, user_id, active, inverse, pyramid, description, created_at, updated_at)
 VALUES
-    ('ETH Scalping Strategy', '66e858a5-ca3c-4c2c-909c-34c605b3e5c7', '$2a$10$.4xIxq7OtoXFaBuxa23.9ewCFety09oCsofyb8AltpGNtB.Y64P7a', 1, 2, true, false, false, 'Short-term scalping strategy for ETH with 5x leverage', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('BTC Long-term Hold', 'f7a3b2c1-d4e5-6f78-9g01-h2i3j4k5l6m7', '$2a$10$.4xIxq7OtoXFaBuxa23.9ewCFety09oCsofyb8AltpGNtB.Y64P7a', 2, 2, true, false, false, 'Conservative BTC accumulation strategy', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('SOL Momentum Trading', 'a1b2c3d4-e5f6-7g89-0h12-i3j4k5l6m7n8', '$2a$10$.4xIxq7OtoXFaBuxa23.9ewCFety09oCsofyb8AltpGNtB.Y64P7a', 3, 3, true, false, true, 'High leverage momentum trading on SOL', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-    ('AVAX Swing Strategy', 'b2c3d4e5-f6g7-8h90-1i23-j4k5l6m7n8o9', '$2a$10$.4xIxq7OtoXFaBuxa23.9ewCFety09oCsofyb8AltpGNtB.Y64P7a', 4, 3, true, false, false, 'Medium-term swing trading for AVAX', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+    -- MODE 1: pyramid=false, inverse=false (Most Restrictive)
+    ('MODE1-ETH-Scalping', '66e858a5-ca3c-4c2c-909c-34c605b3e5c7', '$2a$10$.4xIxq7OtoXFaBuxa23.9ewCFety09oCsofyb8AltpGNtB.Y64P7a', 1, 2, true, false, false, 'MODE 1: Only ONE position allowed (pyramid=false, inverse=false)', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+
+    -- MODE 2: pyramid=false, inverse=true (Allow Reversals)
+    ('MODE2-BTC-Reversal', 'f7a3b2c1-d4e5-6f78-9g01-h2i3j4k5l6m7', '$2a$10$.4xIxq7OtoXFaBuxa23.9ewCFety09oCsofyb8AltpGNtB.Y64P7a', 2, 2, true, true, false, 'MODE 2: Position reversals allowed (pyramid=false, inverse=true)', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+
+    -- MODE 3: pyramid=true, inverse=false (Pyramiding Only)
+    ('MODE3-SOL-Pyramid', 'a1b2c3d4-e5f6-7g89-0h12-i3j4k5l6m7n8', '$2a$10$.4xIxq7OtoXFaBuxa23.9ewCFety09oCsofyb8AltpGNtB.Y64P7a', 3, 3, true, false, true, 'MODE 3: Pyramiding same direction only (pyramid=true, inverse=false)', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+
+    -- MODE 4: pyramid=true, inverse=true (Maximum Flexibility)
+    ('MODE4-AVAX-Flexible', 'b2c3d4e5-f6g7-8h90-1i23-j4k5l6m7n8o9', '$2a$10$.4xIxq7OtoXFaBuxa23.9ewCFety09oCsofyb8AltpGNtB.Y64P7a', 4, 3, true, true, true, 'MODE 4: Maximum flexibility (pyramid=true, inverse=true)', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
