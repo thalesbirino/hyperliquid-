@@ -116,7 +116,8 @@ public class HyperliquidService {
                 if (realApiClient == null) {
                     throw new HyperliquidApiException("Real API client not initialized. Check application configuration.");
                 }
-                logger.info("🚀 REAL MODE: Placing order via Hyperliquid API");
+                logger.info("REAL MODE: Placing order via Hyperliquid API - Asset: {}, Side: {}, User: {}",
+                    config.getAsset(), orderSide.getAction(), user.getUsername());
                 return realApiClient.placeOrder(user, order, "na", apiUrl);
             }
 
@@ -341,7 +342,8 @@ public class HyperliquidService {
                 if (realApiClient == null) {
                     throw new HyperliquidApiException("Real API client not initialized. Check application configuration.");
                 }
-                logger.info("🛡️ REAL MODE: Placing stop-loss order via Hyperliquid API");
+                logger.info("REAL MODE: Placing stop-loss order - Asset ID: {}, Price: {}, Grouping: {}, User: {}",
+                    assetId, stopLossPrice, grouping, user.getUsername());
                 return realApiClient.placeOrder(user, slOrder, grouping, apiUrl);
             }
 

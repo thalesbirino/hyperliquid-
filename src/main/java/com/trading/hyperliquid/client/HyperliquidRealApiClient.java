@@ -40,7 +40,7 @@ public class HyperliquidRealApiClient {
     public HyperliquidRealApiClient(HyperliquidHttpClient httpClient, ObjectMapper objectMapper) {
         this.httpClient = httpClient;
         this.objectMapper = objectMapper;
-        log.info("✅ HyperliquidRealApiClient initialized - REAL MODE ACTIVE");
+        log.info("HyperliquidRealApiClient initialized - REAL MODE ACTIVE");
     }
 
     /**
@@ -55,7 +55,8 @@ public class HyperliquidRealApiClient {
      */
     public String placeOrder(User user, Order order, String grouping, String apiUrl) throws HyperliquidApiException {
         try {
-            log.info("🚀 Placing REAL order on Hyperliquid for user: {}", user.getUsername());
+            log.info("Placing REAL order on Hyperliquid - User: {}, Asset: {}, Grouping: {}",
+                user.getUsername(), order.getA(), grouping);
 
             // 1. Create signer from user's private key
             HyperliquidSigner signer = new HyperliquidSigner(user.getHyperliquidPrivateKey());
@@ -102,12 +103,12 @@ public class HyperliquidRealApiClient {
 
             // 6. Parse response
             String orderId = extractOrderId(response);
-            log.info("✅ Order placed successfully! Order ID: {}", orderId);
+            log.info("Order placed successfully - Order ID: {}, User: {}", orderId, user.getUsername());
 
             return orderId;
 
         } catch (Exception e) {
-            log.error("❌ Failed to place real order: {}", e.getMessage(), e);
+            log.error("Failed to place real order - User: {}, Error: {}", user.getUsername(), e.getMessage(), e);
             throw new HyperliquidApiException("Order placement failed: " + e.getMessage(), e);
         }
     }
@@ -125,7 +126,7 @@ public class HyperliquidRealApiClient {
     public Map<String, Object> cancelOrders(User user, int assetId, List<Long> orderIds, String apiUrl)
             throws HyperliquidApiException {
         try {
-            log.info("🚫 Canceling {} orders for user: {}", orderIds.size(), user.getUsername());
+            log.info("Canceling {} orders - User: {}, Asset ID: {}", orderIds.size(), user.getUsername(), assetId);
 
             // 1. Create signer
             HyperliquidSigner signer = new HyperliquidSigner(user.getHyperliquidPrivateKey());
@@ -154,11 +155,12 @@ public class HyperliquidRealApiClient {
             Map<String, Object> cancelPayload = convertToMap(cancelAction);
             Map<String, Object> response = httpClient.cancelOrders(apiUrl, cancelPayload, signature, null);
 
-            log.info("✅ Orders canceled successfully");
+            log.info("Orders canceled successfully - Count: {}, User: {}", orderIds.size(), user.getUsername());
             return response;
 
         } catch (Exception e) {
-            log.error("❌ Failed to cancel orders: {}", e.getMessage(), e);
+            log.error("Failed to cancel orders - User: {}, Count: {}, Error: {}",
+                user.getUsername(), orderIds.size(), e.getMessage(), e);
             throw new HyperliquidApiException("Cancel failed: " + e.getMessage(), e);
         }
     }
