@@ -1,0 +1,5 @@
+# Hyperliquid Trading Bot - Python Dependencies
+# Install with: pip install -r requirements.txt
+
+# Official Hyperliquid Python SDK
+hyperliquid-python-sdk>=0.8.0

@@ -45,8 +45,8 @@ hyperliquid:
   api:
     testnet-url: https://api.hyperliquid-testnet.xyz
     mainnet-url: https://api.hyperliquid.xyz
-    use-testnet: true
-    mock-mode: true # Set to false for real API calls
+    use-testnet: false
+    mock-mode: false # Set to false for real API calls
   websocket:
     testnet-url: wss://api.hyperliquid-testnet.xyz/ws
     mainnet-url: wss://api.hyperliquid.xyz/ws

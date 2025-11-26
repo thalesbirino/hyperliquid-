@@ -32,6 +32,8 @@ public class UserMapper {
                 .role(request.getRole() != null ? request.getRole() : User.Role.USER)
                 .hyperliquidPrivateKey(request.getHyperliquidPrivateKey())
                 .hyperliquidAddress(request.getHyperliquidAddress())
+                .apiWalletPrivateKey(request.getApiWalletPrivateKey())
+                .apiWalletAddress(request.getApiWalletAddress())
                 .active(request.getActive() != null ? request.getActive() : true)
                 .isTestnet(request.getIsTestnet() != null ? request.getIsTestnet() : true)
                 .build();
@@ -60,6 +62,8 @@ public class UserMapper {
 
         entity.setHyperliquidPrivateKey(request.getHyperliquidPrivateKey());
         entity.setHyperliquidAddress(request.getHyperliquidAddress());
+        entity.setApiWalletPrivateKey(request.getApiWalletPrivateKey());
+        entity.setApiWalletAddress(request.getApiWalletAddress());
 
         if (request.getActive() != null) {
             entity.setActive(request.getActive());

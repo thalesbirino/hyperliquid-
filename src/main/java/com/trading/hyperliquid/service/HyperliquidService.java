@@ -1,6 +1,6 @@
 package com.trading.hyperliquid.service;
 
-import com.trading.hyperliquid.client.HyperliquidRealApiClient;
+import com.trading.hyperliquid.client.PythonHyperliquidClient;
 import com.trading.hyperliquid.exception.HyperliquidApiException;
 import com.trading.hyperliquid.model.entity.Config;
 import com.trading.hyperliquid.model.entity.OrderExecution;
@@ -33,7 +33,7 @@ public class HyperliquidService {
     private final NonceManager nonceManager;
 
     @Autowired(required = false)
-    private HyperliquidRealApiClient realApiClient;
+    private PythonHyperliquidClient pythonClient;
 
     @Value("${hyperliquid.api.mock-mode:true}")
     private boolean mockMode;
@@ -112,13 +112,13 @@ public class HyperliquidService {
             if (mockMode) {
                 return executeMockOrder(orderSide, config, user, mockPrice, order, nonce, apiUrl, accountType);
             } else {
-                // Real API call to Hyperliquid
-                if (realApiClient == null) {
-                    throw new HyperliquidApiException("Real API client not initialized. Check application configuration.");
+                // Real API call to Hyperliquid via Python SDK
+                if (pythonClient == null) {
+                    throw new HyperliquidApiException("Python API client not initialized. Check application configuration.");
                 }
-                logger.info("REAL MODE: Placing order via Hyperliquid API - Asset: {}, Side: {}, User: {}",
+                logger.info("REAL MODE: Placing order via Python SDK - Asset: {}, Side: {}, User: {}",
                     config.getAsset(), orderSide.getAction(), user.getUsername());
-                return realApiClient.placeOrder(user, order, "na", apiUrl);
+                return pythonClient.placeOrder(user, order, "na", apiUrl);
             }
 
         } catch (Exception e) {
@@ -338,13 +338,13 @@ public class HyperliquidService {
                 return executeMockStopLoss(orderSide, slOrderSide, assetId, stopLossPrice, size,
                         groupingType, config, user, nonce, apiUrl, accountType);
             } else {
-                // Real API call to Hyperliquid with stop-loss
-                if (realApiClient == null) {
-                    throw new HyperliquidApiException("Real API client not initialized. Check application configuration.");
+                // Real API call to Hyperliquid with stop-loss via Python SDK
+                if (pythonClient == null) {
+                    throw new HyperliquidApiException("Python API client not initialized. Check application configuration.");
                 }
-                logger.info("REAL MODE: Placing stop-loss order - Asset ID: {}, Price: {}, Grouping: {}, User: {}",
+                logger.info("REAL MODE: Placing stop-loss order via Python SDK - Asset ID: {}, Price: {}, Grouping: {}, User: {}",
                     assetId, stopLossPrice, grouping, user.getUsername());
-                return realApiClient.placeOrder(user, slOrder, grouping, apiUrl);
+                return pythonClient.placeOrder(user, slOrder, grouping, apiUrl);
             }
 
         } catch (Exception e) {

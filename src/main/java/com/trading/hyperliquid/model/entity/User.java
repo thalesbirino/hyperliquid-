@@ -14,8 +14,8 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@ToString(exclude = {"password", "hyperliquidPrivateKey"})
-@EqualsAndHashCode(exclude = {"password", "hyperliquidPrivateKey"})
+@ToString(exclude = {"password", "hyperliquidPrivateKey", "apiWalletPrivateKey"})
+@EqualsAndHashCode(exclude = {"password", "hyperliquidPrivateKey", "apiWalletPrivateKey"})
 public class User {
 
     @Id
@@ -43,6 +43,13 @@ public class User {
 
     @Column(name = "hyperliquid_address", length = 42)
     private String hyperliquidAddress; // Wallet address (0x...)
+
+    @JsonIgnore
+    @Column(name = "api_wallet_private_key", length = 66)
+    private String apiWalletPrivateKey; // API Wallet private key for signing (optional)
+
+    @Column(name = "api_wallet_address", length = 42)
+    private String apiWalletAddress; // API Wallet address (0x...) - used as vaultAddress when present
 
     @Column(nullable = false)
     @Builder.Default
