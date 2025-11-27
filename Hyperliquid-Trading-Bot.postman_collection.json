@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Hyperliquid Trading Bot API",
-    "description": "TradingView Webhook to Hyperliquid Order Execution POC",
+    "description": "TradingView Webhook to Hyperliquid Order Execution POC\n\n## Quick Start\n1. Run Login request first to get JWT token\n2. Token is automatically saved for protected endpoints\n3. Test webhooks (no auth required)\n4. Test CRUD operations (requires JWT)\n\n## Trading Modes\n- MODE 1: pyramid=false, inverse=false (Most Restrictive)\n- MODE 2: pyramid=false, inverse=true (Reversals Allowed)\n- MODE 3: pyramid=true, inverse=false (Pyramiding Only)\n- MODE 4: pyramid=true, inverse=true (Maximum Flexibility)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "12345678"
   },
@@ -17,10 +17,10 @@
   },
   "item": [
     {
-      "name": "Authentication",
+      "name": "1. Authentication",
       "item": [
         {
-          "name": "Login",
+          "name": "Login (admin)",
           "event": [
             {
               "listen": "test",
@@ -28,8 +28,9 @@
                 "exec": [
                   "if (pm.response.code === 200) {",
                   "    var jsonData = pm.response.json();",
-                  "    pm.environment.set(\"jwt_token\", jsonData.data.token);",
-                  "    pm.environment.set(\"username\", jsonData.data.username);",
+                  "    pm.collectionVariables.set(\"jwt_token\", jsonData.data.token);",
+                  "    pm.collectionVariables.set(\"username\", jsonData.data.username);",
+                  "    console.log(\"Token saved successfully!\");",
                   "}"
                 ],
                 "type": "text/javascript"
@@ -56,17 +57,60 @@
               "host": ["{{base_url}}"],
               "path": ["api", "auth", "login"]
             },
-            "description": "Login and receive JWT token. Token is automatically saved to environment variable."
+            "description": "Login and receive JWT token. Token is automatically saved to collection variable."
+          },
+          "response": []
+        },
+        {
+          "name": "Login (trader001)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set(\"jwt_token\", jsonData.data.token);",
+                  "    pm.collectionVariables.set(\"username\", jsonData.data.username);",
+                  "    console.log(\"Token saved successfully!\");",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"trader001\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Login as trader001 user"
           },
           "response": []
         }
       ]
     },
     {
-      "name": "Webhook",
+      "name": "2. Webhook - MODE 1 (Restrictive)",
+      "description": "MODE 1: pyramid=false, inverse=false\n- Only ONE position allowed\n- Same direction: BLOCKED\n- Opposite direction: CLOSE only (no new position)",
       "item": [
         {
-          "name": "Execute Buy Order",
+          "name": "MODE1 - First BUY (should work)",
           "request": {
             "auth": {
               "type": "noauth"
@@ -87,12 +131,38 @@
               "host": ["{{base_url}}"],
               "path": ["api", "webhook"]
             },
-            "description": "Simulate TradingView webhook for BUY order"
+            "description": "First order should be executed"
           },
           "response": []
         },
         {
-          "name": "Execute Sell Order",
+          "name": "MODE1 - Second BUY (should be BLOCKED)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"buy\",\n  \"strategyId\": \"66e858a5-ca3c-4c2c-909c-34c605b3e5c7\",\n  \"password\": \"Admin@9090\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/webhook",
+              "host": ["{{base_url}}"],
+              "path": ["api", "webhook"]
+            },
+            "description": "Should return error: Cannot add to existing position (Pyramid=FALSE)"
+          },
+          "response": []
+        },
+        {
+          "name": "MODE1 - SELL (should CLOSE only)",
           "request": {
             "auth": {
               "type": "noauth"
@@ -113,12 +183,269 @@
               "host": ["{{base_url}}"],
               "path": ["api", "webhook"]
             },
-            "description": "Simulate TradingView webhook for SELL order"
+            "description": "Should close position without opening new one (Inverse=FALSE)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Webhook - MODE 2 (Reversals)",
+      "description": "MODE 2: pyramid=false, inverse=true\n- Same direction: BLOCKED\n- Opposite direction: CLOSE + OPEN new position (reversal)",
+      "item": [
+        {
+          "name": "MODE2 - First BUY",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"buy\",\n  \"strategyId\": \"f7a3b2c1-d4e5-6f78-9g01-h2i3j4k5l6m7\",\n  \"password\": \"Admin@9090\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/webhook",
+              "host": ["{{base_url}}"],
+              "path": ["api", "webhook"]
+            },
+            "description": "First order should be executed"
           },
           "response": []
         },
         {
-          "name": "Invalid Credentials",
+          "name": "MODE2 - SELL (reversal - should work)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"sell\",\n  \"strategyId\": \"f7a3b2c1-d4e5-6f78-9g01-h2i3j4k5l6m7\",\n  \"password\": \"Admin@9090\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/webhook",
+              "host": ["{{base_url}}"],
+              "path": ["api", "webhook"]
+            },
+            "description": "Should close BUY and open new SELL position"
+          },
+          "response": []
+        },
+        {
+          "name": "MODE2 - Second SELL (should be BLOCKED)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"sell\",\n  \"strategyId\": \"f7a3b2c1-d4e5-6f78-9g01-h2i3j4k5l6m7\",\n  \"password\": \"Admin@9090\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/webhook",
+              "host": ["{{base_url}}"],
+              "path": ["api", "webhook"]
+            },
+            "description": "Should return error: Cannot add to existing position (Pyramid=FALSE)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Webhook - MODE 3 (Pyramiding)",
+      "description": "MODE 3: pyramid=true, inverse=false\n- Same direction: ALLOWED (pyramiding)\n- Opposite direction: CLOSE only (no new position)",
+      "item": [
+        {
+          "name": "MODE3 - First BUY",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"buy\",\n  \"strategyId\": \"a1b2c3d4-e5f6-7g89-0h12-i3j4k5l6m7n8\",\n  \"password\": \"Admin@9090\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/webhook",
+              "host": ["{{base_url}}"],
+              "path": ["api", "webhook"]
+            },
+            "description": "First order should be executed"
+          },
+          "response": []
+        },
+        {
+          "name": "MODE3 - Second BUY (pyramiding - should work)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"buy\",\n  \"strategyId\": \"a1b2c3d4-e5f6-7g89-0h12-i3j4k5l6m7n8\",\n  \"password\": \"Admin@9090\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/webhook",
+              "host": ["{{base_url}}"],
+              "path": ["api", "webhook"]
+            },
+            "description": "Should add to existing position (pyramiding)"
+          },
+          "response": []
+        },
+        {
+          "name": "MODE3 - SELL (should CLOSE only)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"sell\",\n  \"strategyId\": \"a1b2c3d4-e5f6-7g89-0h12-i3j4k5l6m7n8\",\n  \"password\": \"Admin@9090\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/webhook",
+              "host": ["{{base_url}}"],
+              "path": ["api", "webhook"]
+            },
+            "description": "Should close all positions without opening new one"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. Webhook - MODE 4 (Flexible)",
+      "description": "MODE 4: pyramid=true, inverse=true\n- Same direction: ALLOWED (pyramiding)\n- Opposite direction: CLOSE + OPEN new position (reversal)",
+      "item": [
+        {
+          "name": "MODE4 - First BUY",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"buy\",\n  \"strategyId\": \"b2c3d4e5-f6g7-8h90-1i23-j4k5l6m7n8o9\",\n  \"password\": \"Admin@9090\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/webhook",
+              "host": ["{{base_url}}"],
+              "path": ["api", "webhook"]
+            },
+            "description": "First order should be executed"
+          },
+          "response": []
+        },
+        {
+          "name": "MODE4 - Second BUY (pyramiding)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"buy\",\n  \"strategyId\": \"b2c3d4e5-f6g7-8h90-1i23-j4k5l6m7n8o9\",\n  \"password\": \"Admin@9090\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/webhook",
+              "host": ["{{base_url}}"],
+              "path": ["api", "webhook"]
+            },
+            "description": "Should add to existing position"
+          },
+          "response": []
+        },
+        {
+          "name": "MODE4 - SELL (reversal)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"sell\",\n  \"strategyId\": \"b2c3d4e5-f6g7-8h90-1i23-j4k5l6m7n8o9\",\n  \"password\": \"Admin@9090\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/webhook",
+              "host": ["{{base_url}}"],
+              "path": ["api", "webhook"]
+            },
+            "description": "Should close all BUY positions and open new SELL"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "6. Webhook - Error Cases",
+      "item": [
+        {
+          "name": "Invalid Password",
           "request": {
             "auth": {
               "type": "noauth"
@@ -139,14 +466,151 @@
               "host": ["{{base_url}}"],
               "path": ["api", "webhook"]
             },
-            "description": "Test webhook with invalid password (should return 401)"
+            "description": "Should return 400 - Invalid credentials"
+          },
+          "response": []
+        },
+        {
+          "name": "Invalid Strategy ID",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"buy\",\n  \"strategyId\": \"non-existent-strategy-id\",\n  \"password\": \"Admin@9090\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/webhook",
+              "host": ["{{base_url}}"],
+              "path": ["api", "webhook"]
+            },
+            "description": "Should return 400 - Strategy not found"
+          },
+          "response": []
+        },
+        {
+          "name": "Missing Action",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"strategyId\": \"66e858a5-ca3c-4c2c-909c-34c605b3e5c7\",\n  \"password\": \"Admin@9090\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/webhook",
+              "host": ["{{base_url}}"],
+              "path": ["api", "webhook"]
+            },
+            "description": "Should return 400 - Action is required"
+          },
+          "response": []
+        },
+        {
+          "name": "Invalid Action",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"invalid\",\n  \"strategyId\": \"66e858a5-ca3c-4c2c-909c-34c605b3e5c7\",\n  \"password\": \"Admin@9090\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/webhook",
+              "host": ["{{base_url}}"],
+              "path": ["api", "webhook"]
+            },
+            "description": "Should return 400 - Action must be 'buy' or 'sell'"
           },
           "response": []
         }
       ]
     },
     {
-      "name": "Strategy Management",
+      "name": "7. Account Operations",
+      "description": "Requires JWT authentication",
+      "item": [
+        {
+          "name": "Get Positions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/account/2/positions",
+              "host": ["{{base_url}}"],
+              "path": ["api", "account", "2", "positions"]
+            },
+            "description": "Get current positions for user ID 2 (trader001)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Open Orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/account/2/open-orders",
+              "host": ["{{base_url}}"],
+              "path": ["api", "account", "2", "open-orders"]
+            },
+            "description": "Get all open orders for user ID 2"
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel Order",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/account/2/cancel-order?asset=ETH&orderId=123456",
+              "host": ["{{base_url}}"],
+              "path": ["api", "account", "2", "cancel-order"],
+              "query": [
+                {
+                  "key": "asset",
+                  "value": "ETH"
+                },
+                {
+                  "key": "orderId",
+                  "value": "123456"
+                }
+              ]
+            },
+            "description": "Cancel an open order"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "8. Strategy Management",
+      "description": "Requires JWT authentication",
       "item": [
         {
           "name": "Get All Strategies",
@@ -188,14 +652,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"New Test Strategy\",\n  \"password\": \"TestPassword123\",\n  \"configId\": 1,\n  \"userId\": 2,\n  \"description\": \"Test strategy for demo\",\n  \"active\": true\n}"
+              "raw": "{\n  \"name\": \"New Test Strategy\",\n  \"password\": \"TestPassword123\",\n  \"configId\": 1,\n  \"userId\": 2,\n  \"description\": \"Test strategy for demo\",\n  \"active\": true,\n  \"pyramid\": false,\n  \"inverse\": true\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/strategy",
               "host": ["{{base_url}}"],
               "path": ["api", "strategy"]
             },
-            "description": "Create a new trading strategy"
+            "description": "Create a new trading strategy with pyramid and inverse flags"
           },
           "response": []
         },
@@ -211,7 +675,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Updated Strategy Name\",\n  \"password\": \"NewPassword123\",\n  \"configId\": 1,\n  \"userId\": 2,\n  \"description\": \"Updated description\",\n  \"active\": true\n}"
+              "raw": "{\n  \"name\": \"Updated Strategy Name\",\n  \"password\": \"NewPassword123\",\n  \"configId\": 1,\n  \"userId\": 2,\n  \"description\": \"Updated description\",\n  \"active\": true,\n  \"pyramid\": true,\n  \"inverse\": true\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/strategy/1",
@@ -239,7 +703,8 @@
       ]
     },
     {
-      "name": "User Management",
+      "name": "9. User Management",
+      "description": "Requires JWT authentication",
       "item": [
         {
           "name": "Get All Users",
@@ -281,14 +746,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"trader003\",\n  \"email\": \"trader003@example.com\",\n  \"password\": \"securePassword123\",\n  \"role\": \"USER\",\n  \"hyperliquidPrivateKey\": \"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef\",\n  \"hyperliquidAddress\": \"0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb\",\n  \"active\": true\n}"
+              "raw": "{\n  \"username\": \"trader003\",\n  \"email\": \"trader003@example.com\",\n  \"password\": \"securePassword123\",\n  \"role\": \"USER\",\n  \"hyperliquidPrivateKey\": \"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef\",\n  \"hyperliquidAddress\": \"0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb\",\n  \"active\": true,\n  \"isTestnet\": true\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/user",
               "host": ["{{base_url}}"],
               "path": ["api", "user"]
             },
-            "description": "Create a new user"
+            "description": "Create a new user with Hyperliquid credentials"
           },
           "response": []
         },
@@ -304,7 +769,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"trader001_updated\",\n  \"email\": \"trader001_new@example.com\",\n  \"password\": \"newPassword123\",\n  \"role\": \"USER\",\n  \"hyperliquidPrivateKey\": \"0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890\",\n  \"hyperliquidAddress\": \"0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199\",\n  \"active\": true\n}"
+              "raw": "{\n  \"username\": \"trader001_updated\",\n  \"email\": \"trader001_new@example.com\",\n  \"password\": \"newPassword123\",\n  \"role\": \"USER\",\n  \"hyperliquidPrivateKey\": \"0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890\",\n  \"hyperliquidAddress\": \"0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199\",\n  \"active\": true,\n  \"isTestnet\": false\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/user/2",
@@ -332,7 +797,8 @@
       ]
     },
     {
-      "name": "Config Management",
+      "name": "10. Config Management",
+      "description": "Requires JWT authentication",
       "item": [
         {
           "name": "Get All Configs",
@@ -374,7 +840,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"MATIC Aggressive Config\",\n  \"asset\": \"MATIC\",\n  \"assetId\": 4,\n  \"lotSize\": 100.0,\n  \"slPercent\": 2.5,\n  \"tpPercent\": 8.0,\n  \"leverage\": 8,\n  \"orderType\": \"LIMIT\",\n  \"timeInForce\": \"Gtc\"\n}"
+              "raw": "{\n  \"name\": \"BTC Aggressive Config\",\n  \"asset\": \"BTC\",\n  \"assetId\": 0,\n  \"lotSize\": 0.001,\n  \"slPercent\": 2.5,\n  \"tpPercent\": 8.0,\n  \"leverage\": 10,\n  \"orderType\": \"LIMIT\",\n  \"timeInForce\": \"Gtc\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/config",
@@ -397,7 +863,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"ETH Conservative Config\",\n  \"asset\": \"ETH\",\n  \"assetId\": 1,\n  \"lotSize\": 0.05,\n  \"slPercent\": 1.5,\n  \"tpPercent\": 3.0,\n  \"leverage\": 2,\n  \"orderType\": \"LIMIT\",\n  \"timeInForce\": \"Gtc\"\n}"
+              "raw": "{\n  \"name\": \"ETH Conservative Config\",\n  \"asset\": \"ETH\",\n  \"assetId\": 1,\n  \"lotSize\": 0.002,\n  \"slPercent\": 1.5,\n  \"tpPercent\": 3.0,\n  \"leverage\": 2,\n  \"orderType\": \"LIMIT\",\n  \"timeInForce\": \"Gtc\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/config/1",
