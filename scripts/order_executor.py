@@ -165,7 +165,8 @@ def cancel_order(data: dict) -> dict:
 
     logger.info(f"Cancelling order {order_id} for {asset}")
 
-    result = exchange.cancel(coin=asset, oid=order_id)
+    # SDK cancel uses positional args: (name, oid)
+    result = exchange.cancel(asset, order_id)
 
     logger.info(f"Cancel result: {result}")
     return result
@@ -190,12 +191,37 @@ def get_positions(data: dict) -> dict:
 
     logger.info(f"Getting positions for {account_address}")
 
-    from hyperliquid.info import Info
     info = Info(base_url, skip_ws=True)
     user_state = info.user_state(account_address)
 
     logger.info(f"User state retrieved")
     return user_state
+
+
+def get_open_orders(data: dict) -> list:
+    """
+    Get open orders for an account
+
+    Args:
+        data: Dictionary containing:
+            - isTestnet: True for testnet, False for mainnet
+            - hyperliquidAddress: Account address to query
+
+    Returns:
+        list: Open orders
+    """
+    is_testnet = data.get('isTestnet', True)
+    base_url = constants.TESTNET_API_URL if is_testnet else constants.MAINNET_API_URL
+
+    account_address = data['hyperliquidAddress']
+
+    logger.info(f"Getting open orders for {account_address}")
+
+    info = Info(base_url, skip_ws=True)
+    open_orders = info.open_orders(account_address)
+
+    logger.info(f"Found {len(open_orders)} open orders")
+    return open_orders
 
 
 def main():
@@ -217,6 +243,8 @@ def main():
             result = cancel_order(input_data)
         elif action == 'positions':
             result = get_positions(input_data)
+        elif action == 'open_orders':
+            result = get_open_orders(input_data)
         else:
             raise ValueError(f"Unknown action: {action}")
 

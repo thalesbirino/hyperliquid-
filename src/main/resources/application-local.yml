@@ -39,11 +39,13 @@ spring:
   flyway:
     enabled: false
 
-# Hyperliquid - Mock Mode
+# Hyperliquid - Real API Mode for testing
+# ETH current price: ~$3015
+# BUY orders at $2500 (won't execute), SELL orders at $4000 (won't execute)
 hyperliquid:
   api:
-    mock-mode: true
-    use-testnet: true
+    mock-mode: false
+    use-testnet: false
 
 # Swagger UI enabled
 springdoc:

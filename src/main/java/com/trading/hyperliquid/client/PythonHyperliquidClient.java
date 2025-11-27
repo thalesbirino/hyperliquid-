@@ -317,4 +317,144 @@ public class PythonHyperliquidClient {
     private String maskSensitiveData(String json) {
         return json.replaceAll("(PrivateKey\"\\s*:\\s*\")[^\"]+\"", "$1***MASKED***\"");
     }
+
+    /**
+     * Get positions for a user account
+     *
+     * @param user User entity with credentials
+     * @return Map containing position information
+     * @throws HyperliquidApiException if request fails
+     */
+    public Map<String, Object> getPositions(User user) throws HyperliquidApiException {
+        log.info("=== GETTING POSITIONS VIA PYTHON SDK ===");
+        log.info("User: {} (testnet={})", user.getUsername(), user.getIsTestnet());
+
+        try {
+            Map<String, Object> input = new HashMap<>();
+            input.put("action", "positions");
+            input.put("isTestnet", user.getIsTestnet());
+            input.put("hyperliquidAddress", user.getHyperliquidAddress());
+
+            Map<String, Object> response = executePythonScript(input);
+            log.info("Positions retrieved successfully");
+            return response;
+
+        } catch (Exception e) {
+            log.error("Failed to get positions via Python SDK", e);
+            throw new HyperliquidApiException("Python SDK error: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Get open orders for a user account
+     *
+     * @param user User entity with credentials
+     * @return List of open orders
+     * @throws HyperliquidApiException if request fails
+     */
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> getOpenOrders(User user) throws HyperliquidApiException {
+        log.info("=== GETTING OPEN ORDERS VIA PYTHON SDK ===");
+        log.info("User: {} (testnet={})", user.getUsername(), user.getIsTestnet());
+
+        try {
+            Map<String, Object> input = new HashMap<>();
+            input.put("action", "open_orders");
+            input.put("isTestnet", user.getIsTestnet());
+            input.put("hyperliquidAddress", user.getHyperliquidAddress());
+
+            String inputJson = objectMapper.writeValueAsString(input);
+            log.debug("Python script input: {}", inputJson);
+
+            ProcessBuilder pb = new ProcessBuilder("python", PYTHON_SCRIPT);
+            pb.directory(new File(System.getProperty("user.dir")));
+            pb.redirectErrorStream(false);
+
+            Process process = pb.start();
+
+            try (OutputStream stdin = process.getOutputStream()) {
+                stdin.write(inputJson.getBytes(StandardCharsets.UTF_8));
+                stdin.flush();
+            }
+
+            boolean completed = process.waitFor(SCRIPT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+
+            if (!completed) {
+                process.destroyForcibly();
+                throw new HyperliquidApiException("Python script timed out");
+            }
+
+            String stdout;
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    sb.append(line);
+                }
+                stdout = sb.toString();
+            }
+
+            if (process.exitValue() != 0 || stdout.isEmpty()) {
+                throw new HyperliquidApiException("Python script failed");
+            }
+
+            log.info("Open orders retrieved successfully");
+            return objectMapper.readValue(stdout, List.class);
+
+        } catch (Exception e) {
+            log.error("Failed to get open orders via Python SDK", e);
+            throw new HyperliquidApiException("Python SDK error: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Cancel an order
+     *
+     * @param user User entity with credentials
+     * @param asset Asset name (e.g., "ETH", "BTC")
+     * @param orderId Order ID to cancel
+     * @return Response from Hyperliquid
+     * @throws HyperliquidApiException if cancellation fails
+     */
+    public Map<String, Object> cancelOrder(User user, String asset, Long orderId) throws HyperliquidApiException {
+        log.info("=== CANCELLING ORDER VIA PYTHON SDK ===");
+        log.info("User: {} | Asset: {} | OrderId: {}", user.getUsername(), asset, orderId);
+
+        try {
+            Map<String, Object> input = new HashMap<>();
+            input.put("action", "cancel");
+            input.put("asset", asset);
+            input.put("orderId", orderId);
+            input.put("isTestnet", user.getIsTestnet());
+            input.put("hyperliquidAddress", user.getHyperliquidAddress());
+
+            // Add private key
+            if (user.getApiWalletPrivateKey() != null && !user.getApiWalletPrivateKey().isEmpty()) {
+                input.put("apiWalletPrivateKey", user.getApiWalletPrivateKey());
+            } else if (user.getHyperliquidPrivateKey() != null) {
+                input.put("hyperliquidPrivateKey", user.getHyperliquidPrivateKey());
+            } else {
+                throw new IllegalArgumentException("No private key available for user: " + user.getUsername());
+            }
+
+            Map<String, Object> response = executePythonScript(input);
+
+            String status = String.valueOf(response.get("status"));
+            if ("ok".equals(status)) {
+                log.info("Order cancelled successfully");
+                return response;
+            } else {
+                String errorMessage = String.valueOf(response.getOrDefault("message", response));
+                log.error("Cancel failed: {}", errorMessage);
+                throw new HyperliquidApiException("Cancel failed: " + errorMessage);
+            }
+
+        } catch (HyperliquidApiException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Failed to cancel order via Python SDK", e);
+            throw new HyperliquidApiException("Python SDK error: " + e.getMessage(), e);
+        }
+    }
 }

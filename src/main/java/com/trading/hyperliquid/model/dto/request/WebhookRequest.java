@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 public class WebhookRequest {
 
     @NotBlank(message = "Action is required")
-    @Pattern(regexp = "^(buy|sell)$", message = "Action must be either 'buy' or 'sell'")
+    @Pattern(regexp = "(?i)^(buy|sell)$", message = "Action must be either 'buy' or 'sell'")
     private String action;
 
     @NotBlank(message = "Strategy ID is required")
