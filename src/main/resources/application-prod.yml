@@ -1,48 +1,86 @@
-# Production Configuration for Hyperliquid Trading Bot
+# ============================================
+# Profile: PROD
+# ============================================
+# PostgreSQL database + Real API (Mainnet)
+# For production deployment
 #
-# SECURITY WARNING:
-# - NEVER commit this file with real credentials to Git
-# - Use environment variables for all sensitive data
-# - This file is .gitignored by default
+# Required environment variables:
+#   - DATABASE_URL: PostgreSQL connection string
+#   - DB_USERNAME: Database username
+#   - DB_PASSWORD: Database password
+#   - JWT_SECRET: Strong secret for JWT signing (256+ bits)
 
 spring:
+  # PostgreSQL Database
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/hyperliquid}
+    driver-class-name: org.postgresql.Driver
+    username: ${DB_USERNAME:hyperliquid}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      idle-timeout: 30000
+      connection-timeout: 20000
+
   jpa:
-    show-sql: false  # Disable SQL logging in production
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
     properties:
       hibernate:
         format_sql: false
 
-# JWT Configuration
-jwt:
-  secret: ${JWT_SECRET}  # REQUIRED: Set via environment variable
-  expiration: 86400000
+  # Disable H2 Console in production
+  h2:
+    console:
+      enabled: false
 
-# Hyperliquid API Configuration
+  # No SQL init in production (use Flyway)
+  sql:
+    init:
+      mode: never
+
+  # Flyway migrations
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
+# Hyperliquid - Real API on Mainnet
 hyperliquid:
   api:
-    testnet-url: https://api.hyperliquid-testnet.xyz
-    mainnet-url: https://api.hyperliquid.xyz
-    use-testnet: ${HYPERLIQUID_USE_TESTNET:true}  # true for testnet, false for mainnet
-    mock-mode: ${HYPERLIQUID_MOCK_MODE:false}      # false for real trading
+    mock-mode: false
+    use-testnet: false
 
-# Logging Configuration
+# Swagger UI disabled in production
+springdoc:
+  swagger-ui:
+    enabled: false
+  api-docs:
+    enabled: false
+
+# Production logging (INFO level, no SQL)
 logging:
   level:
-    com.trading.hyperliquid: INFO  # Less verbose in production
+    root: WARN
+    com.trading.hyperliquid: INFO
     org.springframework.security: WARN
-    org.hibernate.SQL: WARN
-    org.hibernate.type.descriptor.sql.BasicBinder: WARN
+    org.hibernate: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
   file:
     name: logs/hyperliquid-bot.log
     max-size: 10MB
     max-history: 30
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
-    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
 
-# Swagger - Disabled in production for security
-springdoc:
-  api-docs:
-    enabled: false
-  swagger-ui:
-    enabled: false
+# Actuator - restrict sensitive endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized

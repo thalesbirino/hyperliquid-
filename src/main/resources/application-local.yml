@@ -1,13 +1,13 @@
 # ============================================
-# Profile: DEV
+# Profile: LOCAL
 # ============================================
-# H2 file-based database + Real API (Testnet)
-# For development with real Hyperliquid testnet integration
+# H2 in-memory database + Mock mode
+# For local development and testing without real API calls
 
 spring:
-  # H2 File-Based Database (persists between restarts)
+  # H2 In-Memory Database
   datasource:
-    url: jdbc:h2:file:./data/hyperliquid-dev;DB_CLOSE_ON_EXIT=FALSE
+    url: jdbc:h2:mem:hyperliquid-db
     driver-class-name: org.h2.Driver
     username: sa
     password:
@@ -15,34 +15,34 @@ spring:
   jpa:
     database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
-      ddl-auto: update
+      ddl-auto: create
     show-sql: true
     properties:
       hibernate:
         format_sql: true
     defer-datasource-initialization: true
 
-  # H2 Console
+  # H2 Console (only in local)
   h2:
     console:
       enabled: true
       path: /h2-console
       settings:
-        web-allow-others: true
+        web-allow-others: false
 
-  # Load seed data only if empty
+  # Load seed data
   sql:
     init:
-      mode: embedded
+      mode: always
 
-  # Disable Flyway for dev (using JPA auto-update)
+  # Disable Flyway for local (use JPA auto-create)
   flyway:
     enabled: false
 
-# Hyperliquid - Real API on Testnet
+# Hyperliquid - Mock Mode
 hyperliquid:
   api:
-    mock-mode: false
+    mock-mode: true
     use-testnet: true
 
 # Swagger UI enabled
@@ -50,11 +50,12 @@ springdoc:
   swagger-ui:
     enabled: true
 
-# Info logging with some debug
+# Debug logging
 logging:
   level:
     com.trading.hyperliquid: DEBUG
-    org.springframework.security: INFO
+    org.springframework.security: DEBUG
     org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"

@@ -1,0 +1,84 @@
+# ============================================
+# Hyperliquid Trading Bot - Docker Compose
+# ============================================
+# Usage:
+#   Development:  docker-compose up -d
+#   Production:   docker-compose --env-file .env.prod up -d
+#   Logs:         docker-compose logs -f app
+#   Stop:         docker-compose down
+
+version: '3.8'
+
+services:
+  # ==========================================
+  # Application
+  # ==========================================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hyperliquid-bot
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    environment:
+      # Spring Profile
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-prod}
+      # Database
+      - DATABASE_URL=jdbc:postgresql://db:5432/${POSTGRES_DB:-hyperliquid}
+      - DB_USERNAME=${POSTGRES_USER:-hyperliquid}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      # JWT
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRATION=${JWT_EXPIRATION:-86400000}
+      # JVM
+      - JAVA_OPTS=${JAVA_OPTS:--Xms256m -Xmx512m}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - hyperliquid-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ==========================================
+  # PostgreSQL Database
+  # ==========================================
+  db:
+    image: postgres:15-alpine
+    container_name: hyperliquid-db
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-hyperliquid}
+      - POSTGRES_USER=${POSTGRES_USER:-hyperliquid}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    restart: unless-stopped
+    networks:
+      - hyperliquid-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hyperliquid} -d ${POSTGRES_DB:-hyperliquid}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+# ==========================================
+# Networks
+# ==========================================
+networks:
+  hyperliquid-network:
+    driver: bridge
+
+# ==========================================
+# Volumes
+# ==========================================
+volumes:
+  postgres_data:
+    driver: local
