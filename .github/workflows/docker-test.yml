@@ -1,0 +1,127 @@
+# ============================================
+# Docker Build & Test - GitHub Actions
+# ============================================
+# Tests Docker deployment in real Ubuntu environment
+# Runs on every push to main or manually
+
+name: Docker Build & Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  docker-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: |
+          docker compose build
+          echo "✅ Docker image built successfully"
+
+      - name: Start container
+        run: |
+          docker compose up -d
+          echo "⏳ Waiting for application to start..."
+          sleep 45
+
+      - name: Check container status
+        run: |
+          docker ps -a
+          docker logs hyperliquid-bot --tail 50
+
+      - name: Wait for health check
+        run: |
+          echo "⏳ Waiting for health check to pass..."
+          for i in {1..20}; do
+            if curl -sf http://localhost:8080/actuator/health > /dev/null 2>&1; then
+              echo "✅ Health check passed!"
+              curl -s http://localhost:8080/actuator/health | jq .
+              exit 0
+            fi
+            echo "Attempt $i/20 - waiting..."
+            sleep 5
+          done
+          echo "❌ Health check failed after 100 seconds"
+          docker logs hyperliquid-bot --tail 100
+          exit 1
+
+      - name: Test Login endpoint
+        run: |
+          echo "🔐 Testing login..."
+          RESPONSE=$(curl -s -X POST http://localhost:8080/api/auth/login \
+            -H "Content-Type: application/json" \
+            -d '{"username":"admin","password":"password123"}')
+
+          echo "$RESPONSE" | jq .
+
+          if echo "$RESPONSE" | jq -e '.success == true' > /dev/null; then
+            echo "✅ Login successful!"
+          else
+            echo "❌ Login failed!"
+            exit 1
+          fi
+
+      - name: Test Webhook endpoint
+        run: |
+          echo "📡 Testing webhook..."
+          RESPONSE=$(curl -s -X POST http://localhost:8080/api/webhook \
+            -H "Content-Type: application/json" \
+            -d '{
+              "action": "buy",
+              "strategyId": "66e858a5-ca3c-4c2c-909c-34c605b3e5c7",
+              "password": "Admin@9090"
+            }')
+
+          echo "$RESPONSE" | jq .
+
+          if echo "$RESPONSE" | jq -e '.success == true' > /dev/null; then
+            echo "✅ Webhook executed successfully!"
+          else
+            echo "❌ Webhook failed!"
+            exit 1
+          fi
+
+      - name: Test protected endpoint (with JWT)
+        run: |
+          echo "🔒 Testing protected endpoint..."
+
+          # Get JWT token
+          TOKEN=$(curl -s -X POST http://localhost:8080/api/auth/login \
+            -H "Content-Type: application/json" \
+            -d '{"username":"admin","password":"password123"}' | jq -r '.data.token')
+
+          # Test /api/user endpoint
+          RESPONSE=$(curl -s http://localhost:8080/api/user \
+            -H "Authorization: Bearer $TOKEN")
+
+          echo "$RESPONSE" | jq .
+
+          if echo "$RESPONSE" | jq -e 'length > 0' > /dev/null; then
+            echo "✅ Protected endpoint works!"
+          else
+            echo "❌ Protected endpoint failed!"
+            exit 1
+          fi
+
+      - name: Show container logs on success
+        if: success()
+        run: |
+          echo "📋 Final container logs:"
+          docker logs hyperliquid-bot --tail 30
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose down
+          echo "🧹 Cleanup complete"

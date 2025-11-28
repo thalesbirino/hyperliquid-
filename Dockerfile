@@ -30,10 +30,11 @@ FROM eclipse-temurin:17-jre-alpine
 
 WORKDIR /app
 
-# Install Python 3 and pip
+# Install Python 3, pip, curl for health checks
 RUN apk add --no-cache \
     python3 \
     py3-pip \
+    curl \
     && pip3 install --no-cache-dir --break-system-packages \
     hyperliquid-python-sdk \
     eth-account
@@ -61,9 +62,9 @@ ENV JAVA_OPTS="-Xms256m -Xmx512m"
 # Expose port
 EXPOSE 8080
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD wget -q --spider http://localhost:8080/actuator/health || exit 1
+# Health check using curl
+HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
+    CMD curl -sf http://localhost:8080/actuator/health || exit 1
 
 # Entry point
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
