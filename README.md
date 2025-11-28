@@ -115,14 +115,14 @@ http://YOUR_SERVER_IP:8080/api/webhook
 }
 ```
 
-### 3. Available Strategies (Seed Data)
+### 3. Available Strategies (Seed Data - ETH/USDC)
 
 | Strategy | strategyId | Password |
 |----------|-----------|----------|
-| ETH Scalping | `66e858a5-ca3c-4c2c-909c-34c605b3e5c7` | `Admin@9090` |
-| BTC Long-term | `f7a3b2c1-d4e5-6f78-9g01-h2i3j4k5l6m7` | `Admin@9090` |
-| SOL Momentum | `a1b2c3d4-e5f6-7g89-0h12-i3j4k5l6m7n8` | `Admin@9090` |
-| AVAX Swing | `b2c3d4e5-f6g7-8h90-1i23-j4k5l6m7n8o9` | `Admin@9090` |
+| ETH Mode 1 - Normal | `11111111-1111-1111-1111-111111111111` | `Admin@9090` |
+| ETH Mode 2 - Pyramid | `22222222-2222-2222-2222-222222222222` | `Admin@9090` |
+| ETH Mode 3 - Inverse | `33333333-3333-3333-3333-333333333333` | `Admin@9090` |
+| ETH Mode 4 - Inverse Pyramid | `44444444-4444-4444-4444-444444444444` | `Admin@9090` |
 
 ### 4. Trading Modes
 
@@ -248,15 +248,11 @@ SERVER_PORT=9090 docker compose up -d
 |----------|----------|------|
 | admin | password123 | ADMIN |
 | trader001 | password123 | USER |
-| trader002 | password123 | USER |
 
 ### Configs
 | Name | Asset | Lot Size | Leverage |
 |------|-------|----------|----------|
-| ETH Scalping | ETH | 0.1 | 5x |
-| BTC Long-term | BTC | 0.01 | 3x |
-| SOL Momentum | SOL | 1.0 | 10x |
-| AVAX Swing | AVAX | 5.0 | 5x |
+| ETH Trading Config | ETH | 0.1 | 5x |
 
 ---
 
