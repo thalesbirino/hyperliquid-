@@ -41,7 +41,7 @@ docker compose logs -f app
 curl http://localhost:8080/actuator/health
 ```
 
-**Application will be available at:** `http://YOUR_SERVER_IP:8080`
+**Application will be available at:** `http://145.223.117.151:8080`
 
 ### Option 2: Local Development (without Docker)
 
@@ -102,7 +102,7 @@ curl -X PUT http://localhost:8080/api/user/2 \
 ### 1. Webhook URL
 
 ```
-http://YOUR_SERVER_IP:8080/api/webhook
+http://145.223.117.151:8080/api/webhook
 ```
 
 ### 2. Alert Message Format
@@ -135,6 +135,150 @@ http://YOUR_SERVER_IP:8080/api/webhook
 
 ---
 
+## Testing Guide
+
+After configuring your Hyperliquid credentials, follow this guide to test all 4 trading modes.
+
+### Prerequisites
+
+1. Application deployed and healthy
+2. Hyperliquid credentials configured (see Post-Deployment Configuration)
+3. Sufficient balance in your Hyperliquid account
+
+### Step 1: Verify Health
+
+```bash
+curl http://145.223.117.151:8080/actuator/health
+# Expected: {"status":"UP"}
+```
+
+### Step 2: Test MODE 1 - Normal (Long)
+
+Opens a long position on BUY, closes on SELL.
+
+```bash
+# Open Long Position
+curl -X POST http://145.223.117.151:8080/api/webhook \
+  -H "Content-Type: application/json" \
+  -d '{"action":"buy","strategyId":"11111111-1111-1111-1111-111111111111","password":"password123"}'
+
+# Verify position opened in Hyperliquid app
+
+# Close Long Position
+curl -X POST http://145.223.117.151:8080/api/webhook \
+  -H "Content-Type: application/json" \
+  -d '{"action":"sell","strategyId":"11111111-1111-1111-1111-111111111111","password":"password123"}'
+```
+
+### Step 3: Test MODE 2 - Pyramid (Accumulate Long)
+
+Multiple BUYs add to position, SELLs reduce it.
+
+```bash
+# Open first long position
+curl -X POST http://145.223.117.151:8080/api/webhook \
+  -H "Content-Type: application/json" \
+  -d '{"action":"buy","strategyId":"22222222-2222-2222-2222-222222222222","password":"password123"}'
+
+# Add to long position (pyramid)
+curl -X POST http://145.223.117.151:8080/api/webhook \
+  -H "Content-Type: application/json" \
+  -d '{"action":"buy","strategyId":"22222222-2222-2222-2222-222222222222","password":"password123"}'
+
+# Verify position size increased in Hyperliquid app
+
+# Reduce position
+curl -X POST http://145.223.117.151:8080/api/webhook \
+  -H "Content-Type: application/json" \
+  -d '{"action":"sell","strategyId":"22222222-2222-2222-2222-222222222222","password":"password123"}'
+
+# Close remaining position
+curl -X POST http://145.223.117.151:8080/api/webhook \
+  -H "Content-Type: application/json" \
+  -d '{"action":"sell","strategyId":"22222222-2222-2222-2222-222222222222","password":"password123"}'
+```
+
+### Step 4: Test MODE 3 - Inverse (Short)
+
+Opens a short position on BUY, closes on SELL.
+
+```bash
+# Open Short Position
+curl -X POST http://145.223.117.151:8080/api/webhook \
+  -H "Content-Type: application/json" \
+  -d '{"action":"buy","strategyId":"33333333-3333-3333-3333-333333333333","password":"password123"}'
+
+# Verify SHORT position opened in Hyperliquid app
+
+# Close Short Position
+curl -X POST http://145.223.117.151:8080/api/webhook \
+  -H "Content-Type: application/json" \
+  -d '{"action":"sell","strategyId":"33333333-3333-3333-3333-333333333333","password":"password123"}'
+```
+
+### Step 5: Test MODE 4 - Inverse Pyramid (Accumulate Short)
+
+Multiple BUYs add to short, SELLs reduce it.
+
+```bash
+# Open first short position
+curl -X POST http://145.223.117.151:8080/api/webhook \
+  -H "Content-Type: application/json" \
+  -d '{"action":"buy","strategyId":"44444444-4444-4444-4444-444444444444","password":"password123"}'
+
+# Add to short position (pyramid)
+curl -X POST http://145.223.117.151:8080/api/webhook \
+  -H "Content-Type: application/json" \
+  -d '{"action":"buy","strategyId":"44444444-4444-4444-4444-444444444444","password":"password123"}'
+
+# Verify SHORT position size increased in Hyperliquid app
+
+# Reduce short position
+curl -X POST http://145.223.117.151:8080/api/webhook \
+  -H "Content-Type: application/json" \
+  -d '{"action":"sell","strategyId":"44444444-4444-4444-4444-444444444444","password":"password123"}'
+
+# Close remaining short
+curl -X POST http://145.223.117.151:8080/api/webhook \
+  -H "Content-Type: application/json" \
+  -d '{"action":"sell","strategyId":"44444444-4444-4444-4444-444444444444","password":"password123"}'
+```
+
+### Step 6: Verify All Positions Closed
+
+```bash
+# Get JWT token
+TOKEN=$(curl -s -X POST http://145.223.117.151:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"password123"}' | jq -r '.data.token')
+
+# Check positions (should be empty)
+curl -s "http://145.223.117.151:8080/api/account/2/positions" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Expected: "assetPositions":[]
+```
+
+### Expected Results
+
+| Mode | BUY Action | SELL Action | Test Result |
+|------|------------|-------------|-------------|
+| 1 | Opens LONG | Closes LONG | Position opens/closes correctly |
+| 2 | Adds to LONG | Reduces LONG | Position size increases/decreases |
+| 3 | Opens SHORT | Closes SHORT | SHORT position opens/closes correctly |
+| 4 | Adds to SHORT | Reduces SHORT | SHORT position size increases/decreases |
+
+### Common Issues
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| `Invalid strategy ID or password` | Wrong strategyId or password | Use exact values from table above |
+| `User wallet credentials not configured` | Missing API credentials | Configure via PUT /api/user/2 |
+| `Insufficient balance` | Not enough funds | Add USDC to Hyperliquid account |
+| `Order failed` | Market conditions | Check Hyperliquid app for details |
+
+---
+
 ## API Reference
 
 ### Public Endpoints
@@ -152,9 +296,9 @@ http://YOUR_SERVER_IP:8080/api/webhook
 | GET/POST/PUT/DELETE | `/api/user/*` | User management |
 | GET/POST/PUT/DELETE | `/api/config/*` | Config management |
 | GET/POST/PUT/DELETE | `/api/strategy/*` | Strategy management |
-| GET | `/api/account/positions` | Get open positions |
-| GET | `/api/account/open-orders` | Get open orders |
-| DELETE | `/api/account/cancel-all` | Cancel all orders |
+| GET | `/api/account/{userId}/positions` | Get open positions |
+| GET | `/api/account/{userId}/open-orders` | Get open orders |
+| DELETE | `/api/account/{userId}/cancel-all` | Cancel all orders |
 
 ### Example Requests
 
@@ -171,14 +315,14 @@ curl -X POST http://localhost:8080/api/webhook \
   -H "Content-Type: application/json" \
   -d '{
     "action": "buy",
-    "strategyId": "66e858a5-ca3c-4c2c-909c-34c605b3e5c7",
-    "password": "Admin@9090"
+    "strategyId": "11111111-1111-1111-1111-111111111111",
+    "password": "password123"
   }'
 ```
 
 **Get Positions (with JWT):**
 ```bash
-curl http://localhost:8080/api/account/positions?userId=2 \
+curl "http://localhost:8080/api/account/2/positions" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
