@@ -57,7 +57,42 @@ mvn spring-boot:run
 
 The application will start on `http://localhost:8080`
 
-### 4. Access Points
+### 4. Configure Hyperliquid Wallet Credentials
+
+**IMPORTANT**: The seed data contains placeholder wallet credentials. Before testing with real trades, you must update the user with your actual Hyperliquid wallet:
+
+```bash
+# 1. First, login to get JWT token
+curl -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"password123"}'
+
+# 2. Copy the token from response, then update trader001 (user ID 2) with your credentials
+curl -X PUT http://localhost:8080/api/user/2 \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{
+    "username": "trader001",
+    "email": "trader001@example.com",
+    "password": "password123",
+    "role": "USER",
+    "hyperliquidAddress": "YOUR_VAULT_ADDRESS",
+    "apiWalletPrivateKey": "YOUR_API_WALLET_PRIVATE_KEY",
+    "apiWalletAddress": "YOUR_API_WALLET_ADDRESS",
+    "isTestnet": false,
+    "active": true
+  }'
+```
+
+**Required Fields for Trading:**
+- `hyperliquidAddress`: Your Hyperliquid vault address (the address you see on app.hyperliquid.xyz)
+- `apiWalletPrivateKey`: Private key of your API Wallet (created in Hyperliquid settings)
+- `apiWalletAddress`: Public address of your API Wallet
+- `isTestnet`: Set to `false` for mainnet, `true` for testnet
+
+**Security Note**: Never commit real private keys to version control!
+
+### 5. Access Points
 
 - **Swagger UI**: http://localhost:8080/swagger-ui/index.html
 - **H2 Console**: http://localhost:8080/h2-console
