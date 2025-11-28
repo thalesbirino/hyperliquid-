@@ -22,7 +22,7 @@ Spring Boot application that receives TradingView webhooks and executes trades o
 
 ## Deployment
 
-### Option 1: VPS/Cloud Server (Recommended)
+### Option 1: Docker (Recommended)
 
 **Requirements:** Docker + Docker Compose installed
 
@@ -43,18 +43,7 @@ curl http://localhost:8080/actuator/health
 
 **Application will be available at:** `http://YOUR_SERVER_IP:8080`
 
-### Option 2: GitHub Actions CI/CD
-
-Every push to `main` triggers automated Docker testing:
-- Builds Docker image
-- Runs health checks
-- Tests login endpoint
-- Tests webhook endpoint
-- Tests protected endpoints with JWT
-
-Check workflow status at: `Actions` tab in GitHub repository.
-
-### Option 3: Local Development (without Docker)
+### Option 2: Local Development (without Docker)
 
 ```bash
 # Requires Java 17+ and Maven
