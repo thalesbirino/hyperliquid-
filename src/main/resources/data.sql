@@ -38,7 +38,7 @@ INSERT INTO configs (name, asset, asset_id, lot_size, sl_percent, tp_percent, le
 -- ==========================================
 -- STRATEGIES (4 Modes - All ETH/USDC)
 -- ==========================================
--- Password for all strategies: Admin@9090 (BCrypt hashed)
+-- Password for all strategies: password123 (BCrypt hashed - same as users)
 -- All strategies use the same ETH config (config_id=1) and trader001 (user_id=2)
 
 INSERT INTO strategies (name, strategy_id, password, description, config_id, user_id, inverse, pyramid, active, created_at, updated_at) VALUES
@@ -46,27 +46,27 @@ INSERT INTO strategies (name, strategy_id, password, description, config_id, use
 -- MODE 1: Normal (pyramid=false, inverse=false)
 -- buy signal = open long, sell signal = close long
 ('ETH Mode 1 - Normal', '11111111-1111-1111-1111-111111111111',
- '$2a$10$8K1p/a0dL1LXMIgoEDFrwOeS/vSB0HJV5yx0aIFnOqXnqYQFaQYmu',
+ '$2a$10$XkkgBRL6GUCwFSXz88OuRu/3VPI6cuaLKLNFseGvrPJ7ehFiHVl6G',
  'MODE 1: Normal trading. Buy=Open Long, Sell=Close Long',
  1, 2, false, false, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
 -- MODE 2: Pyramid (pyramid=true, inverse=false)
 -- buy signal = add to long, sell signal = reduce long
 ('ETH Mode 2 - Pyramid', '22222222-2222-2222-2222-222222222222',
- '$2a$10$8K1p/a0dL1LXMIgoEDFrwOeS/vSB0HJV5yx0aIFnOqXnqYQFaQYmu',
+ '$2a$10$XkkgBRL6GUCwFSXz88OuRu/3VPI6cuaLKLNFseGvrPJ7ehFiHVl6G',
  'MODE 2: Pyramid mode. Buy=Add Long, Sell=Reduce Long',
  1, 2, false, true, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
 -- MODE 3: Inverse (pyramid=false, inverse=true)
 -- buy signal = open short, sell signal = close short
 ('ETH Mode 3 - Inverse', '33333333-3333-3333-3333-333333333333',
- '$2a$10$8K1p/a0dL1LXMIgoEDFrwOeS/vSB0HJV5yx0aIFnOqXnqYQFaQYmu',
+ '$2a$10$XkkgBRL6GUCwFSXz88OuRu/3VPI6cuaLKLNFseGvrPJ7ehFiHVl6G',
  'MODE 3: Inverse trading. Buy=Open Short, Sell=Close Short',
  1, 2, true, false, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 
 -- MODE 4: Inverse Pyramid (pyramid=true, inverse=true)
 -- buy signal = add to short, sell signal = reduce short
 ('ETH Mode 4 - Inverse Pyramid', '44444444-4444-4444-4444-444444444444',
- '$2a$10$8K1p/a0dL1LXMIgoEDFrwOeS/vSB0HJV5yx0aIFnOqXnqYQFaQYmu',
+ '$2a$10$XkkgBRL6GUCwFSXz88OuRu/3VPI6cuaLKLNFseGvrPJ7ehFiHVl6G',
  'MODE 4: Inverse Pyramid. Buy=Add Short, Sell=Reduce Short',
  1, 2, true, true, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);

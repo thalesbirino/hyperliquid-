@@ -110,8 +110,8 @@ http://YOUR_SERVER_IP:8080/api/webhook
 ```json
 {
   "action": "{{strategy.order.action}}",
-  "strategyId": "66e858a5-ca3c-4c2c-909c-34c605b3e5c7",
-  "password": "Admin@9090"
+  "strategyId": "11111111-1111-1111-1111-111111111111",
+  "password": "password123"
 }
 ```
 
@@ -119,10 +119,10 @@ http://YOUR_SERVER_IP:8080/api/webhook
 
 | Strategy | strategyId | Password |
 |----------|-----------|----------|
-| ETH Mode 1 - Normal | `11111111-1111-1111-1111-111111111111` | `Admin@9090` |
-| ETH Mode 2 - Pyramid | `22222222-2222-2222-2222-222222222222` | `Admin@9090` |
-| ETH Mode 3 - Inverse | `33333333-3333-3333-3333-333333333333` | `Admin@9090` |
-| ETH Mode 4 - Inverse Pyramid | `44444444-4444-4444-4444-444444444444` | `Admin@9090` |
+| ETH Mode 1 - Normal | `11111111-1111-1111-1111-111111111111` | `password123` |
+| ETH Mode 2 - Pyramid | `22222222-2222-2222-2222-222222222222` | `password123` |
+| ETH Mode 3 - Inverse | `33333333-3333-3333-3333-333333333333` | `password123` |
+| ETH Mode 4 - Inverse Pyramid | `44444444-4444-4444-4444-444444444444` | `password123` |
 
 ### 4. Trading Modes
 
