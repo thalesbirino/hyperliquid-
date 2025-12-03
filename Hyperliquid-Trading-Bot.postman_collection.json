@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Hyperliquid Trading Bot API",
-    "description": "TradingView Webhook to Hyperliquid Order Execution\n\n## Quick Start\n1. Run Login request first to get JWT token\n2. Token is automatically saved for protected endpoints\n3. Test webhooks (no auth required)\n4. Test CRUD operations (requires JWT)\n\n## Trading Modes (ETH/USDC)\n- MODE 1: Normal (pyramid=false, inverse=false) - BUY=Long, SELL=Close\n- MODE 2: Pyramid (pyramid=true, inverse=false) - BUY=Add Long, SELL=Reduce\n- MODE 3: Inverse (pyramid=false, inverse=true) - BUY=Short, SELL=Close\n- MODE 4: Inverse Pyramid (pyramid=true, inverse=true) - BUY=Add Short, SELL=Reduce",
+    "description": "TradingView Webhook to Hyperliquid Order Execution\n\n## Quick Start\n1. Run Health Check to verify VPS is running\n2. Run Login request to get JWT token (auto-saved)\n3. Configure credentials via Update User (if needed)\n4. Test webhooks for each trading mode\n\n## VPS URL\n- Production: http://145.223.117.151:8080\n\n## Trading Modes (ETH/USDC)\n| Mode | Pyramid | Inverse | Description |\n|------|---------|---------|-------------|\n| 1 | false | false | Normal: BUY=Long, SELL=Close |\n| 2 | true | false | Pyramid: BUY=Add Long, SELL=Reduce |\n| 3 | false | true | Inverse: BUY=Short, SELL=Close |\n| 4 | true | true | Inverse Pyramid: BUY=Add Short, SELL=Reduce |\n\n## Strategy IDs\n- MODE 1: 11111111-1111-1111-1111-111111111111\n- MODE 2: 22222222-2222-2222-2222-222222222222\n- MODE 3: 33333333-3333-3333-3333-333333333333\n- MODE 4: 44444444-4444-4444-4444-444444444444\n\n## All Passwords: password123\n\n## Tested Features (Verified)\n- Order execution on Hyperliquid mainnet\n- Stop-loss automatic placement (2% from entry)\n- Inverse mode (BUY opens SHORT)\n- Position close with SL cancellation\n- Market orders with IOC + 0.5% slippage",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "12345678"
   },
@@ -17,6 +17,45 @@
   },
   "item": [
     {
+      "name": "0. Health Check",
+      "item": [
+        {
+          "name": "Health Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Application is UP\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.eql(\"UP\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/actuator/health",
+              "host": ["{{base_url}}"],
+              "path": ["actuator", "health"]
+            },
+            "description": "Check if the application is running and healthy"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "1. Authentication",
       "item": [
         {
@@ -31,6 +70,9 @@
                   "    pm.collectionVariables.set(\"jwt_token\", jsonData.data.token);",
                   "    pm.collectionVariables.set(\"username\", jsonData.data.username);",
                   "    console.log(\"Token saved successfully!\");",
+                  "    pm.test(\"Login successful\", function () {",
+                  "        pm.expect(jsonData.success).to.eql(true);",
+                  "    });",
                   "}"
                 ],
                 "type": "text/javascript"
@@ -107,10 +149,32 @@
     },
     {
       "name": "2. Webhook - MODE 1 (Normal Long)",
-      "description": "MODE 1: pyramid=false, inverse=false\n- BUY = Open LONG position\n- SELL = Close LONG position\n- No pyramiding allowed",
+      "description": "MODE 1: pyramid=false, inverse=false\n- BUY = Open LONG position\n- SELL = Close LONG position\n- No pyramiding allowed\n- Stop-loss automatically placed at 2% below entry",
       "item": [
         {
           "name": "MODE1 - BUY (Open Long)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Order executed successfully\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.eql(true);",
+                  "});",
+                  "pm.test(\"Action is BUY\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.action).to.eql(\"BUY\");",
+                  "});",
+                  "pm.test(\"Stop-loss placed\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.include(\"SL Active\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "auth": {
               "type": "noauth"
@@ -131,12 +195,30 @@
               "host": ["{{base_url}}"],
               "path": ["api", "webhook"]
             },
-            "description": "Opens a LONG position on ETH"
+            "description": "Opens a LONG position on ETH with automatic stop-loss"
           },
           "response": []
         },
         {
           "name": "MODE1 - Second BUY (should be BLOCKED)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Order blocked as expected\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.eql(false);",
+                  "});",
+                  "pm.test(\"Error mentions Pyramid=FALSE\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.message).to.include(\"Pyramid=FALSE\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "auth": {
               "type": "noauth"
@@ -163,6 +245,24 @@
         },
         {
           "name": "MODE1 - SELL (Close Long)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Order executed successfully\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.eql(true);",
+                  "});",
+                  "pm.test(\"Position closed (Inverse=FALSE)\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.include(\"Inverse=FALSE\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "auth": {
               "type": "noauth"
@@ -183,7 +283,7 @@
               "host": ["{{base_url}}"],
               "path": ["api", "webhook"]
             },
-            "description": "Closes the LONG position"
+            "description": "Closes the LONG position without opening opposite (Inverse=FALSE)"
           },
           "response": []
         }
@@ -301,10 +401,28 @@
     },
     {
       "name": "4. Webhook - MODE 3 (Inverse Short)",
-      "description": "MODE 3: pyramid=false, inverse=true\n- BUY = Open SHORT position\n- SELL = Close SHORT position\n- No pyramiding allowed",
+      "description": "MODE 3: pyramid=false, inverse=true\n- BUY = Open SHORT position (inverted!)\n- SELL = Close SHORT position\n- No pyramiding allowed\n- Verified working on mainnet",
       "item": [
         {
           "name": "MODE3 - BUY (Open Short)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Order executed successfully\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.eql(true);",
+                  "});",
+                  "pm.test(\"Stop-loss placed\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.include(\"SL Active\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "auth": {
               "type": "noauth"
@@ -325,12 +443,26 @@
               "host": ["{{base_url}}"],
               "path": ["api", "webhook"]
             },
-            "description": "Opens a SHORT position on ETH"
+            "description": "Opens a SHORT position on ETH (inverse mode - BUY becomes SELL)"
           },
           "response": []
         },
         {
           "name": "MODE3 - Second BUY (should be BLOCKED)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Order blocked as expected\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.eql(false);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "auth": {
               "type": "noauth"
@@ -357,6 +489,20 @@
         },
         {
           "name": "MODE3 - SELL (Close Short)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Order executed successfully\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.eql(true);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "auth": {
               "type": "noauth"
@@ -377,7 +523,7 @@
               "host": ["{{base_url}}"],
               "path": ["api", "webhook"]
             },
-            "description": "Closes the SHORT position"
+            "description": "Closes the SHORT position (inverse mode - SELL becomes BUY to close)"
           },
           "response": []
         }
@@ -498,6 +644,20 @@
       "item": [
         {
           "name": "Invalid Password",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Returns error for invalid password\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.eql(false);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "auth": {
               "type": "noauth"
@@ -518,12 +678,26 @@
               "host": ["{{base_url}}"],
               "path": ["api", "webhook"]
             },
-            "description": "Should return 400 - Invalid credentials"
+            "description": "Should return error - Invalid credentials"
           },
           "response": []
         },
         {
           "name": "Invalid Strategy ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Returns error for invalid strategy\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.eql(false);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "auth": {
               "type": "noauth"
@@ -544,7 +718,7 @@
               "host": ["{{base_url}}"],
               "path": ["api", "webhook"]
             },
-            "description": "Should return 400 - Strategy not found"
+            "description": "Should return error - Strategy not found"
           },
           "response": []
         },
@@ -570,7 +744,7 @@
               "host": ["{{base_url}}"],
               "path": ["api", "webhook"]
             },
-            "description": "Should return 400 - Action is required"
+            "description": "Should return error - Action is required"
           },
           "response": []
         },
@@ -596,7 +770,7 @@
               "host": ["{{base_url}}"],
               "path": ["api", "webhook"]
             },
-            "description": "Should return 400 - Action must be 'buy' or 'sell'"
+            "description": "Should return error - Action must be 'buy' or 'sell'"
           },
           "response": []
         }
@@ -604,10 +778,34 @@
     },
     {
       "name": "7. Account Operations",
-      "description": "Requires JWT authentication",
+      "description": "Requires JWT authentication. Use these to verify positions and manage orders.",
       "item": [
         {
           "name": "Get Positions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Positions retrieved successfully\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.eql(true);",
+                  "});",
+                  "// Log position info for easy viewing",
+                  "var jsonData = pm.response.json();",
+                  "var positions = jsonData.data.assetPositions;",
+                  "if (positions && positions.length > 0) {",
+                  "    positions.forEach(function(p) {",
+                  "        console.log('Position: ' + p.position.coin + ' Size: ' + p.position.szi + ' Entry: ' + p.position.entryPx);",
+                  "    });",
+                  "} else {",
+                  "    console.log('No open positions');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [],
@@ -616,12 +814,36 @@
               "host": ["{{base_url}}"],
               "path": ["api", "account", "2", "positions"]
             },
-            "description": "Get current positions for user ID 2 (trader001)"
+            "description": "Get current positions for user ID 2 (trader001). Positive szi = LONG, Negative szi = SHORT"
           },
           "response": []
         },
         {
-          "name": "Get Open Orders",
+          "name": "Get Open Orders (Stop-Loss)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Open orders retrieved successfully\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.eql(true);",
+                  "});",
+                  "// Log order info",
+                  "var jsonData = pm.response.json();",
+                  "var orders = jsonData.data;",
+                  "if (orders && orders.length > 0) {",
+                  "    orders.forEach(function(o) {",
+                  "        console.log('Order: ' + o.coin + ' Side: ' + o.side + ' Price: ' + o.limitPx + ' Size: ' + o.sz);",
+                  "    });",
+                  "} else {",
+                  "    console.log('No open orders');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [],
@@ -630,7 +852,7 @@
               "host": ["{{base_url}}"],
               "path": ["api", "account", "2", "open-orders"]
             },
-            "description": "Get all open orders for user ID 2"
+            "description": "Get all open orders for user ID 2. Includes stop-loss orders placed by the system."
           },
           "response": []
         },
@@ -654,7 +876,7 @@
                 }
               ]
             },
-            "description": "Cancel an open order"
+            "description": "Cancel an open order. Replace orderId with actual order ID from Get Open Orders."
           },
           "response": []
         }
@@ -756,7 +978,7 @@
     },
     {
       "name": "9. User Management",
-      "description": "Requires JWT authentication",
+      "description": "Requires JWT authentication. Use Update User to configure Hyperliquid credentials.",
       "item": [
         {
           "name": "Get All Users",
@@ -778,11 +1000,11 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/user/1",
+              "raw": "{{base_url}}/api/user/2",
               "host": ["{{base_url}}"],
-              "path": ["api", "user", "1"]
+              "path": ["api", "user", "2"]
             },
-            "description": "Get specific user by ID"
+            "description": "Get trader001 user details"
           },
           "response": []
         },
@@ -810,7 +1032,7 @@
           "response": []
         },
         {
-          "name": "Update User (Configure Credentials)",
+          "name": "Update User - Configure Credentials",
           "request": {
             "method": "PUT",
             "header": [
@@ -828,7 +1050,30 @@
               "host": ["{{base_url}}"],
               "path": ["api", "user", "2"]
             },
-            "description": "Update trader001 with real Hyperliquid credentials. Replace YOUR_VAULT_ADDRESS, YOUR_API_WALLET_PRIVATE_KEY, and YOUR_API_WALLET_ADDRESS with real values."
+            "description": "Configure trader001 with Hyperliquid credentials.\n\nREQUIRED FIELDS:\n- hyperliquidAddress: Your main wallet address (vault)\n- apiWalletPrivateKey: Your API wallet private key (with 0x prefix)\n- apiWalletAddress: Your API wallet address\n- isTestnet: false for mainnet, true for testnet"
+          },
+          "response": []
+        },
+        {
+          "name": "Update User - Reset to Placeholder",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"trader001\",\n  \"email\": \"trader001@example.com\",\n  \"password\": \"password123\",\n  \"role\": \"USER\",\n  \"hyperliquidAddress\": \"0x0000000000000000000000000000000000000002\",\n  \"apiWalletPrivateKey\": \"0x0000000000000000000000000000000000000000000000000000000000000002\",\n  \"apiWalletAddress\": \"0x0000000000000000000000000000000000000002\",\n  \"active\": true,\n  \"isTestnet\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/user/2",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user", "2"]
+            },
+            "description": "Reset trader001 credentials to placeholder values after testing. Use this to clear real credentials from the system."
           },
           "response": []
         },
@@ -892,14 +1137,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"BTC Aggressive Config\",\n  \"asset\": \"BTC\",\n  \"assetId\": 0,\n  \"lotSize\": 0.001,\n  \"slPercent\": 2.5,\n  \"tpPercent\": 8.0,\n  \"leverage\": 10,\n  \"orderType\": \"LIMIT\",\n  \"timeInForce\": \"Gtc\"\n}"
+              "raw": "{\n  \"name\": \"BTC Aggressive Config\",\n  \"asset\": \"BTC\",\n  \"assetId\": 0,\n  \"lotSize\": 0.001,\n  \"slPercent\": 2.5,\n  \"tpPercent\": 8.0,\n  \"leverage\": 10,\n  \"orderType\": \"MARKET\",\n  \"timeInForce\": \"Ioc\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/config",
               "host": ["{{base_url}}"],
               "path": ["api", "config"]
             },
-            "description": "Create a new trading configuration"
+            "description": "Create a new trading configuration. Asset IDs: BTC=0, ETH=1, SOL=2"
           },
           "response": []
         },
@@ -915,7 +1160,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"ETH Conservative Config\",\n  \"asset\": \"ETH\",\n  \"assetId\": 1,\n  \"lotSize\": 0.002,\n  \"slPercent\": 1.5,\n  \"tpPercent\": 3.0,\n  \"leverage\": 2,\n  \"orderType\": \"LIMIT\",\n  \"timeInForce\": \"Gtc\"\n}"
+              "raw": "{\n  \"name\": \"ETH Conservative Config\",\n  \"asset\": \"ETH\",\n  \"assetId\": 1,\n  \"lotSize\": 0.02,\n  \"slPercent\": 1.5,\n  \"tpPercent\": 3.0,\n  \"leverage\": 5,\n  \"orderType\": \"MARKET\",\n  \"timeInForce\": \"Ioc\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/config/1",
