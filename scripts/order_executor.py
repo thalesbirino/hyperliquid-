@@ -30,6 +30,31 @@ except ImportError:
     sys.exit(1)
 
 
+def get_market_price(asset: str, is_testnet: bool = False) -> float:
+    """
+    Get current market price for an asset from Hyperliquid
+
+    Args:
+        asset: Coin name (e.g., "ETH", "BTC")
+        is_testnet: True for testnet, False for mainnet
+
+    Returns:
+        float: Current mid price
+    """
+    base_url = constants.TESTNET_API_URL if is_testnet else constants.MAINNET_API_URL
+    info = Info(base_url, skip_ws=True)
+
+    # Get all mids (mid prices for all assets)
+    all_mids = info.all_mids()
+
+    if asset in all_mids:
+        price = float(all_mids[asset])
+        logger.info(f"Market price for {asset}: {price}")
+        return price
+    else:
+        raise ValueError(f"Asset {asset} not found in market data")
+
+
 def execute_order(data: dict) -> dict:
     """
     Execute an order on Hyperliquid via the official SDK
@@ -39,9 +64,10 @@ def execute_order(data: dict) -> dict:
             - asset: Coin name (e.g., "ETH", "BTC")
             - isBuy: True for buy, False for sell
             - size: Order size as string
-            - price: Limit price as string
+            - price: Limit price as string (optional - if not provided, uses market price)
             - reduceOnly: Boolean for reduce-only orders
             - timeInForce: TIF setting ("Gtc", "Ioc", "Alo")
+            - orderType: "MARKET" or "LIMIT" (default: uses price if provided)
             - isTestnet: True for testnet, False for mainnet
             - hyperliquidAddress: Main account address
             - hyperliquidPrivateKey: Main account private key (if not using API wallet)
@@ -96,18 +122,38 @@ def execute_order(data: dict) -> dict:
         exchange = Exchange(wallet, base_url)
         logger.info(f"Exchange initialized with main wallet")
 
-    # Build order type
-    tif = data.get('timeInForce', 'Gtc')
-    order_type = {"limit": {"tif": tif}}
-
     # Extract order parameters
     asset = data['asset']
     is_buy = data['isBuy']
     size = float(data['size'])
-    price = float(data['price'])
     reduce_only = data.get('reduceOnly', False)
+    order_type_str = data.get('orderType', 'LIMIT').upper()
 
-    logger.info(f"Placing order: {asset} {'BUY' if is_buy else 'SELL'} {size} @ {price} (reduce_only={reduce_only}, tif={tif})")
+    # Determine price - use market price for MARKET orders or if no price provided
+    if order_type_str == 'MARKET' or not data.get('price'):
+        # Get current market price
+        market_price = get_market_price(asset, is_testnet)
+
+        # For market orders, add slippage tolerance (0.5% for buys, -0.5% for sells)
+        # This ensures IOC orders execute immediately
+        slippage = 0.005  # 0.5%
+        if is_buy:
+            price = market_price * (1 + slippage)  # Pay slightly more to ensure fill
+        else:
+            price = market_price * (1 - slippage)  # Accept slightly less to ensure fill
+
+        logger.info(f"Using market price {market_price} with slippage -> {price}")
+    else:
+        price = float(data['price'])
+
+    # Round price to appropriate precision (Hyperliquid uses 5 significant figures)
+    price = round(price, 2) if price > 100 else round(price, 4)
+
+    # Build order type - use IOC for market orders to ensure immediate execution
+    tif = 'Ioc' if order_type_str == 'MARKET' else data.get('timeInForce', 'Gtc')
+    order_type = {"limit": {"tif": tif}}
+
+    logger.info(f"Placing order: {asset} {'BUY' if is_buy else 'SELL'} {size} @ {price} (reduce_only={reduce_only}, tif={tif}, type={order_type_str})")
 
     # Place order - SDK 0.21+ uses positional args: (name, is_buy, sz, px, order_type, reduce_only)
     result = exchange.order(

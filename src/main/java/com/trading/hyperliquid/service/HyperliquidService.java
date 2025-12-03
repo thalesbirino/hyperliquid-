@@ -118,7 +118,9 @@ public class HyperliquidService {
                 }
                 logger.info("REAL MODE: Placing order via Python SDK - Asset: {}, Side: {}, User: {}",
                     config.getAsset(), orderSide.getAction(), user.getUsername());
-                return pythonClient.placeOrder(user, order, "na", apiUrl);
+                // Pass orderType from config - MARKET orders will fetch real-time price
+                String orderType = config.getOrderType() != null ? config.getOrderType() : "LIMIT";
+                return pythonClient.placeOrder(user, order, "na", apiUrl, orderType);
             }
 
         } catch (Exception e) {

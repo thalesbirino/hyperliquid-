@@ -93,17 +93,32 @@ public class PythonHyperliquidClient {
      * @throws HyperliquidApiException if order placement fails
      */
     public String placeOrder(User user, Order order, String grouping, String apiUrl) throws HyperliquidApiException {
+        return placeOrder(user, order, grouping, apiUrl, "LIMIT");
+    }
+
+    /**
+     * Place an order on Hyperliquid via Python SDK with order type
+     *
+     * @param user User entity with credentials
+     * @param order Order to place
+     * @param grouping Order grouping ("na" for single orders)
+     * @param apiUrl API URL (testnet or mainnet) - informational only, Python SDK determines from isTestnet
+     * @param orderType Order type ("MARKET" or "LIMIT")
+     * @return Order ID from Hyperliquid
+     * @throws HyperliquidApiException if order placement fails
+     */
+    public String placeOrder(User user, Order order, String grouping, String apiUrl, String orderType) throws HyperliquidApiException {
         log.info("=== PLACING ORDER VIA PYTHON SDK ===");
         log.info("User: {} (testnet={})", user.getUsername(), user.getIsTestnet());
-        log.info("Asset: {} | Side: {} | Size: {} | Price: {}",
+        log.info("Asset: {} | Side: {} | Size: {} | Type: {}",
                 getAssetName(order.getA()),
                 order.getB() ? "BUY" : "SELL",
                 order.getS(),
-                order.getP());
+                orderType);
 
         try {
             // Build input data for Python script
-            Map<String, Object> inputData = buildOrderInput(user, order);
+            Map<String, Object> inputData = buildOrderInput(user, order, orderType);
 
             // Execute Python script
             Map<String, Object> response = executePythonScript(inputData);
@@ -133,6 +148,13 @@ public class PythonHyperliquidClient {
      * Build input data map for the Python script
      */
     private Map<String, Object> buildOrderInput(User user, Order order) {
+        return buildOrderInput(user, order, "LIMIT");
+    }
+
+    /**
+     * Build input data map for the Python script with order type
+     */
+    private Map<String, Object> buildOrderInput(User user, Order order, String orderType) {
         Map<String, Object> input = new HashMap<>();
 
         // Action type
@@ -142,9 +164,14 @@ public class PythonHyperliquidClient {
         input.put("asset", getAssetName(order.getA()));
         input.put("isBuy", order.getB());
         input.put("size", order.getS());
-        input.put("price", order.getP());
         input.put("reduceOnly", order.getR());
         input.put("timeInForce", extractTif(order.getT()));
+        input.put("orderType", orderType);
+
+        // Only include price for LIMIT orders - MARKET orders will fetch real-time price
+        if (!"MARKET".equalsIgnoreCase(orderType)) {
+            input.put("price", order.getP());
+        }
 
         // User credentials
         input.put("isTestnet", user.getIsTestnet());
