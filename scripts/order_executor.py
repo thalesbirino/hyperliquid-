@@ -146,8 +146,25 @@ def execute_order(data: dict) -> dict:
     else:
         price = float(data['price'])
 
-    # Round price to appropriate precision (Hyperliquid uses 5 significant figures)
-    price = round(price, 2) if price > 100 else round(price, 4)
+    # Round price to tick size (ETH tick = 0.1, BTC tick = 1.0, etc.)
+    # Hyperliquid requires prices to be divisible by tick size
+    tick_sizes = {
+        'BTC': 1.0,
+        'ETH': 0.1,
+        'SOL': 0.01,
+        'AVAX': 0.01,
+        'DOGE': 0.00001,
+        'XRP': 0.0001,
+        'MATIC': 0.0001,
+        'ARB': 0.0001,
+        'OP': 0.001,
+        'LINK': 0.001,
+    }
+    tick_size = tick_sizes.get(asset, 0.01)  # Default tick size
+    price = round(price / tick_size) * tick_size
+    # Round to avoid floating point errors
+    decimals = len(str(tick_size).split('.')[-1]) if '.' in str(tick_size) else 0
+    price = round(price, decimals)
 
     # Build order type - use IOC for market orders to ensure immediate execution
     tif = 'Ioc' if order_type_str == 'MARKET' else data.get('timeInForce', 'Gtc')

@@ -499,14 +499,37 @@ public class HyperliquidService {
                 logger.info("║ Status        : CANCELLED");
                 logger.info("╚══════════════════════════════════════════════════════════╝");
             } else {
-                // Real API call (not implemented in POC)
-                // TODO: Implement real HTTP POST to apiUrl with cancel action
-                throw new HyperliquidApiException(ErrorMessages.API_INTEGRATION_NOT_IMPLEMENTED);
+                // Real API call via Python SDK
+                if (pythonClient == null) {
+                    throw new HyperliquidApiException("Python client not available");
+                }
+
+                // Get asset name from assetId
+                String asset = getAssetNameFromId(assetId);
+                logger.info("REAL MODE: Cancelling order via Python SDK - OrderId: {}, Asset: {}, User: {}",
+                    orderId, asset, user.getUsername());
+
+                pythonClient.cancelOrder(user, asset, Long.parseLong(orderId));
+                logger.info("Order {} cancelled successfully", orderId);
             }
 
         } catch (Exception e) {
             logger.error("Failed to cancel order {}: {}", orderId, e.getMessage(), e);
             throw new HyperliquidApiException("Order cancellation failed: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Get asset name from asset ID
+     */
+    private String getAssetNameFromId(Integer assetId) {
+        // Common mappings
+        switch (assetId) {
+            case 0: return "BTC";
+            case 1: return "ETH";
+            case 2: return "SOL";
+            case 3: return "AVAX";
+            default: return "ETH"; // Default to ETH
         }
     }
 }

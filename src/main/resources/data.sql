@@ -33,7 +33,7 @@ INSERT INTO users (username, email, password, role, hyperliquid_private_key, hyp
 -- Single ETH config used by all 4 strategy modes
 
 INSERT INTO configs (name, asset, asset_id, lot_size, sl_percent, tp_percent, leverage, order_type, time_in_force, created_at, updated_at) VALUES
-('ETH Trading Config', 'ETH', 1, 0.1, 2.00, 5.00, 5, 'MARKET', 'Ioc', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+('ETH Trading Config', 'ETH', 1, 0.01, 2.00, 5.00, 20, 'MARKET', 'Ioc', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 -- ==========================================
 -- STRATEGIES (4 Modes - All ETH/USDC)

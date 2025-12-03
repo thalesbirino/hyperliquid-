@@ -155,7 +155,32 @@ public class WebhookService {
         cancelPendingStopLossOrders(openPositions, context.getConfig(), context.getUser());
 
         // ================================================================
-        // FLOWCHART: Square off position (Close all open orders)
+        // EXECUTE CLOSE ORDER ON HYPERLIQUID
+        // This is critical - we need to actually close the position on the exchange!
+        // ================================================================
+        String closeOrderId = null;
+        try {
+            // Determine actual order action - invert if strategy is inverse mode
+            String actualAction = context.getRequest().getAction();
+            if (context.getStrategy().getInverse()) {
+                actualAction = "buy".equalsIgnoreCase(context.getRequest().getAction()) ? "sell" : "buy";
+                log.info("INVERSE MODE: Close order action '{}' inverted to '{}'", context.getRequest().getAction(), actualAction);
+            }
+
+            log.info("Executing close order on Hyperliquid...");
+            closeOrderId = hyperliquidService.placeOrder(
+                    actualAction,
+                    context.getConfig(),
+                    context.getUser()
+            );
+            log.info("Close order executed. Order ID: {}", closeOrderId);
+        } catch (Exception e) {
+            log.error("Failed to execute close order on Hyperliquid: {}", e.getMessage());
+            // Continue with closing in DB even if exchange order fails
+        }
+
+        // ================================================================
+        // FLOWCHART: Square off position (Close all open orders in DB)
         // ================================================================
         orderExecutionService.closeAllPositions(openPositions);
         log.info("Squared off {} positions", openPositions.size());
@@ -174,11 +199,11 @@ public class WebhookService {
         } else {
             log.info("FLOWCHART PATH: Inverse=FALSE - marked closed, NO new position");
             return WebhookResponse.success(
-                    "CLOSED",
+                    closeOrderId != null ? closeOrderId : "CLOSED",
                     context.getRequest().getAction().toUpperCase(),
                     context.getConfig().getAsset(),
-                    "0",
-                    "0",
+                    context.getConfig().getLotSize().toString(),
+                    getMockPrice(context.getConfig().getAsset()).toString(),
                     "Position closed (Inverse=FALSE). No opposite order placed."
             );
         }
@@ -237,8 +262,15 @@ public class WebhookService {
             OrderExecution.OrderSide orderSide) {
 
         try {
+            // Determine actual order action - invert if strategy is inverse mode
+            String actualAction = request.getAction();
+            if (strategy.getInverse()) {
+                actualAction = "buy".equalsIgnoreCase(request.getAction()) ? "sell" : "buy";
+                log.info("INVERSE MODE: Original action '{}' inverted to '{}'", request.getAction(), actualAction);
+            }
+
             // 1. Place primary order on Hyperliquid
-            String orderId = hyperliquidService.placeOrder(request.getAction(), config, user);
+            String orderId = hyperliquidService.placeOrder(actualAction, config, user);
             log.info("Primary order placed. Order ID: {}", orderId);
 
             // 2. Get fill price (mock for POC)
