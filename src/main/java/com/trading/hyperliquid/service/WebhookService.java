@@ -157,19 +157,21 @@ public class WebhookService {
         // ================================================================
         // EXECUTE CLOSE ORDER ON HYPERLIQUID
         // This is critical - we need to actually close the position on the exchange!
+        // To close a position, we must place an order OPPOSITE to the lastOrderSide:
+        // - If lastOrderSide is BUY (we have a LONG), we need to SELL to close
+        // - If lastOrderSide is SELL (we have a SHORT), we need to BUY to close
         // ================================================================
         String closeOrderId = null;
         try {
-            // Determine actual order action - invert if strategy is inverse mode
-            String actualAction = context.getRequest().getAction();
-            if (context.getStrategy().getInverse()) {
-                actualAction = "buy".equalsIgnoreCase(context.getRequest().getAction()) ? "sell" : "buy";
-                log.info("INVERSE MODE: Close order action '{}' inverted to '{}'", context.getRequest().getAction(), actualAction);
-            }
+            // Determine close action based on the ACTUAL position side in DB/exchange
+            // This is independent of inverse mode - we're closing whatever position exists
+            String closeAction = context.getLastOrderSide().isBuy() ? "sell" : "buy";
+            log.info("Closing position: lastOrderSide={}, closeAction={}",
+                    context.getLastOrderSide(), closeAction);
 
             log.info("Executing close order on Hyperliquid...");
             closeOrderId = hyperliquidService.placeOrder(
-                    actualAction,
+                    closeAction,
                     context.getConfig(),
                     context.getUser()
             );

@@ -520,16 +520,51 @@ public class HyperliquidService {
     }
 
     /**
-     * Get asset name from asset ID
+     * Get asset name from asset ID.
+     * Hyperliquid asset IDs are assigned in order of listing.
+     * See: https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint
      */
     private String getAssetNameFromId(Integer assetId) {
-        // Common mappings
         switch (assetId) {
             case 0: return "BTC";
             case 1: return "ETH";
             case 2: return "SOL";
             case 3: return "AVAX";
-            default: return "ETH"; // Default to ETH
+            case 4: return "APE";
+            case 5: return "DOGE";
+            case 6: return "MATIC";
+            case 7: return "LTC";
+            case 8: return "BNB";
+            case 9: return "ARB";
+            case 10: return "OP";
+            case 11: return "CRV";
+            case 12: return "LINK";
+            case 13: return "DYDX";
+            case 14: return "WLD";
+            case 15: return "ATOM";
+            case 16: return "SUI";
+            case 17: return "BLUR";
+            case 18: return "SEI";
+            case 19: return "XRP";
+            case 20: return "DOT";
+            case 21: return "INJ";
+            case 22: return "TIA";
+            case 23: return "RUNE";
+            case 24: return "NEAR";
+            case 25: return "FTM";
+            case 26: return "AAVE";
+            case 27: return "MKR";
+            case 28: return "CFX";
+            case 29: return "SNX";
+            case 30: return "FIL";
+            case 31: return "LDO";
+            case 32: return "GMX";
+            case 33: return "PEPE";
+            case 34: return "ORDI";
+            case 35: return "SHIB";
+            default:
+                logger.warn("Unknown asset ID: {}. Using ID as asset name.", assetId);
+                return "ASSET_" + assetId;
         }
     }
 }
