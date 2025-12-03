@@ -19,11 +19,12 @@ public final class TradingConstants {
     public static final String MOCK_ORDER_ID_PREFIX = "MOCK-";
 
     // Mock Asset Prices (for POC/Development)
-    public static final BigDecimal MOCK_BTC_PRICE = new BigDecimal("45000.00");
-    public static final BigDecimal MOCK_ETH_PRICE = new BigDecimal("2500.00");
-    public static final BigDecimal MOCK_SOL_PRICE = new BigDecimal("110.00");
-    public static final BigDecimal MOCK_AVAX_PRICE = new BigDecimal("35.00");
-    public static final BigDecimal MOCK_MATIC_PRICE = new BigDecimal("0.85");
+    // Note: These prices are used for IOC orders - should be close to market price
+    public static final BigDecimal MOCK_BTC_PRICE = new BigDecimal("98000.00");
+    public static final BigDecimal MOCK_ETH_PRICE = new BigDecimal("3900.00");
+    public static final BigDecimal MOCK_SOL_PRICE = new BigDecimal("230.00");
+    public static final BigDecimal MOCK_AVAX_PRICE = new BigDecimal("50.00");
+    public static final BigDecimal MOCK_MATIC_PRICE = new BigDecimal("0.55");
     public static final BigDecimal MOCK_DEFAULT_PRICE = new BigDecimal("100.00");
 
     // Security/Display Constants
