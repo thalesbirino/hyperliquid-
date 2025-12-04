@@ -3,6 +3,7 @@ package com.trading.hyperliquid.service;
 import com.trading.hyperliquid.model.dto.request.WebhookRequest;
 import com.trading.hyperliquid.model.dto.response.WebhookResponse;
 import com.trading.hyperliquid.model.entity.*;
+import com.trading.hyperliquid.model.hyperliquid.OrderResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -121,7 +122,7 @@ class WebhookServiceTest {
             when(orderExecutionService.getLastOrderByStrategy(anyLong()))
                     .thenReturn(Optional.empty());
             when(hyperliquidService.placeOrder(anyString(), any(Config.class), any(User.class)))
-                    .thenReturn("ORDER-123");
+                    .thenReturn(OrderResult.of("ORDER-123", BigDecimal.valueOf(3900)));
             when(orderExecutionService.createOrderExecution(anyString(), any(), any(), any(), any(), any()))
                     .thenReturn(createMockOrderExecution("ORDER-123", OrderExecution.OrderSide.BUY));
 
@@ -144,7 +145,7 @@ class WebhookServiceTest {
             when(orderExecutionService.getLastOrderByStrategy(anyLong()))
                     .thenReturn(Optional.empty());
             when(hyperliquidService.placeOrder(anyString(), any(Config.class), any(User.class)))
-                    .thenReturn("ORDER-456");
+                    .thenReturn(OrderResult.of("ORDER-456", BigDecimal.valueOf(3900)));
             when(orderExecutionService.createOrderExecution(anyString(), any(), any(), any(), any(), any()))
                     .thenReturn(createMockOrderExecution("ORDER-456", OrderExecution.OrderSide.SELL));
 
@@ -176,7 +177,7 @@ class WebhookServiceTest {
             when(orderExecutionService.getLastOrderByStrategy(anyLong()))
                     .thenReturn(Optional.of(closedOrder));
             when(hyperliquidService.placeOrder(anyString(), any(Config.class), any(User.class)))
-                    .thenReturn("NEW-ORDER-789");
+                    .thenReturn(OrderResult.of("NEW-ORDER-789", BigDecimal.valueOf(3900)));
             when(orderExecutionService.createOrderExecution(anyString(), any(), any(), any(), any(), any()))
                     .thenReturn(createMockOrderExecution("NEW-ORDER-789", OrderExecution.OrderSide.BUY));
 
@@ -298,7 +299,7 @@ class WebhookServiceTest {
             when(orderExecutionService.getOpenPositionsByStrategy(anyLong()))
                     .thenReturn(List.of(openBuyOrder));
             when(hyperliquidService.placeOrder(eq("sell"), any(Config.class), any(User.class)))
-                    .thenReturn("SELL-ORDER-999");
+                    .thenReturn(OrderResult.of("SELL-ORDER-999", BigDecimal.valueOf(3900)));
             when(orderExecutionService.createOrderExecution(anyString(), any(), any(), any(), any(), any()))
                     .thenReturn(createMockOrderExecution("SELL-ORDER-999", OrderExecution.OrderSide.SELL));
 
@@ -339,7 +340,7 @@ class WebhookServiceTest {
             when(orderExecutionService.getLastOrderByStrategy(anyLong()))
                     .thenReturn(Optional.of(openBuyOrder));
             when(hyperliquidService.placeOrder(eq("buy"), any(Config.class), any(User.class)))
-                    .thenReturn("BUY-ORDER-2");
+                    .thenReturn(OrderResult.of("BUY-ORDER-2", BigDecimal.valueOf(3900)));
             when(orderExecutionService.createOrderExecution(anyString(), any(), any(), any(), any(), any()))
                     .thenReturn(createMockOrderExecution("BUY-ORDER-2", OrderExecution.OrderSide.BUY));
 
@@ -399,7 +400,7 @@ class WebhookServiceTest {
             when(orderExecutionService.getLastOrderByStrategy(anyLong()))
                     .thenReturn(Optional.of(openSellOrder));
             when(hyperliquidService.placeOrder(eq("sell"), any(Config.class), any(User.class)))
-                    .thenReturn("SELL-ORDER-2");
+                    .thenReturn(OrderResult.of("SELL-ORDER-2", BigDecimal.valueOf(3900)));
             when(orderExecutionService.createOrderExecution(anyString(), any(), any(), any(), any(), any()))
                     .thenReturn(createMockOrderExecution("SELL-ORDER-2", OrderExecution.OrderSide.SELL));
 
@@ -424,7 +425,7 @@ class WebhookServiceTest {
             when(orderExecutionService.getOpenPositionsByStrategy(anyLong()))
                     .thenReturn(List.of(openSellOrder));
             when(hyperliquidService.placeOrder(eq("buy"), any(Config.class), any(User.class)))
-                    .thenReturn("BUY-ORDER-REVERSAL");
+                    .thenReturn(OrderResult.of("BUY-ORDER-REVERSAL", BigDecimal.valueOf(3900)));
             when(orderExecutionService.createOrderExecution(anyString(), any(), any(), any(), any(), any()))
                     .thenReturn(createMockOrderExecution("BUY-ORDER-REVERSAL", OrderExecution.OrderSide.BUY));
 
@@ -464,7 +465,7 @@ class WebhookServiceTest {
             when(orderExecutionService.getOpenPositionsByStrategy(anyLong()))
                     .thenReturn(List.of(openBuyOrder));
             when(hyperliquidService.placeOrder(anyString(), any(), any()))
-                    .thenReturn("NEW-ORDER");
+                    .thenReturn(OrderResult.of("NEW-ORDER", BigDecimal.valueOf(3900)));
             when(orderExecutionService.createOrderExecution(anyString(), any(), any(), any(), any(), any()))
                     .thenReturn(createMockOrderExecution("NEW-ORDER", OrderExecution.OrderSide.SELL));
 
@@ -492,7 +493,7 @@ class WebhookServiceTest {
             when(orderExecutionService.getOpenPositionsByStrategy(anyLong()))
                     .thenReturn(List.of(openBuyOrder));
             when(hyperliquidService.placeOrder(anyString(), any(), any()))
-                    .thenReturn("NEW-ORDER");
+                    .thenReturn(OrderResult.of("NEW-ORDER", BigDecimal.valueOf(3900)));
             when(orderExecutionService.createOrderExecution(anyString(), any(), any(), any(), any(), any()))
                     .thenReturn(createMockOrderExecution("NEW-ORDER", OrderExecution.OrderSide.SELL));
 

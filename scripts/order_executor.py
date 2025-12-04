@@ -67,7 +67,9 @@ def execute_order(data: dict) -> dict:
             - price: Limit price as string (optional - if not provided, uses market price)
             - reduceOnly: Boolean for reduce-only orders
             - timeInForce: TIF setting ("Gtc", "Ioc", "Alo")
-            - orderType: "MARKET" or "LIMIT" (default: uses price if provided)
+            - orderType: "MARKET", "LIMIT", or "TRIGGER" (for stop-loss)
+            - triggerPx: Trigger price for TRIGGER orders (required if orderType=TRIGGER)
+            - tpsl: "sl" for stop-loss, "tp" for take-profit (required if orderType=TRIGGER)
             - isTestnet: True for testnet, False for mainnet
             - hyperliquidAddress: Main account address
             - hyperliquidPrivateKey: Main account private key (if not using API wallet)
@@ -166,11 +168,36 @@ def execute_order(data: dict) -> dict:
     decimals = len(str(tick_size).split('.')[-1]) if '.' in str(tick_size) else 0
     price = round(price, decimals)
 
-    # Build order type - use IOC for market orders to ensure immediate execution
-    tif = 'Ioc' if order_type_str == 'MARKET' else data.get('timeInForce', 'Gtc')
-    order_type = {"limit": {"tif": tif}}
+    # Build order type based on orderType parameter
+    if order_type_str == 'TRIGGER':
+        # TRIGGER order for stop-loss or take-profit
+        # Uses trigger price to activate, then executes as market order
+        trigger_px = data.get('triggerPx')
+        if not trigger_px:
+            raise ValueError("triggerPx is required for TRIGGER orders")
 
-    logger.info(f"Placing order: {asset} {'BUY' if is_buy else 'SELL'} {size} @ {price} (reduce_only={reduce_only}, tif={tif}, type={order_type_str})")
+        # Convert trigger price to float (SDK expects numeric, not string)
+        trigger_px_float = float(trigger_px)
+
+        # Round trigger price to tick size
+        trigger_px_float = round(trigger_px_float / tick_size) * tick_size
+        trigger_px_float = round(trigger_px_float, decimals)
+
+        tpsl = data.get('tpsl', 'sl')  # 'sl' for stop-loss, 'tp' for take-profit
+
+        order_type = {
+            "trigger": {
+                "triggerPx": trigger_px_float,  # SDK expects float, not string
+                "isMarket": True,
+                "tpsl": tpsl
+            }
+        }
+        logger.info(f"Placing TRIGGER order: {asset} {'BUY' if is_buy else 'SELL'} {size} @ {price} (trigger={trigger_px_float}, tpsl={tpsl}, reduce_only={reduce_only})")
+    else:
+        # Regular LIMIT or MARKET order
+        tif = 'Ioc' if order_type_str == 'MARKET' else data.get('timeInForce', 'Gtc')
+        order_type = {"limit": {"tif": tif}}
+        logger.info(f"Placing order: {asset} {'BUY' if is_buy else 'SELL'} {size} @ {price} (reduce_only={reduce_only}, tif={tif}, type={order_type_str})")
 
     # Place order - SDK 0.21+ uses positional args: (name, is_buy, sz, px, order_type, reduce_only)
     result = exchange.order(
@@ -183,6 +210,13 @@ def execute_order(data: dict) -> dict:
     )
 
     logger.info(f"Order result: {result}")
+
+    # Add execution price to result for SL calculation
+    # The price used in order is the limit price (with slippage for MARKET orders)
+    if isinstance(result, dict):
+        result['executionPrice'] = str(price)
+        logger.info(f"Added executionPrice={price} to result")
+
     return result
 
 

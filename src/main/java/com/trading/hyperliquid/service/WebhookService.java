@@ -6,6 +6,7 @@ import com.trading.hyperliquid.model.entity.Config;
 import com.trading.hyperliquid.model.entity.OrderExecution;
 import com.trading.hyperliquid.model.entity.Strategy;
 import com.trading.hyperliquid.model.entity.User;
+import com.trading.hyperliquid.model.hyperliquid.OrderResult;
 import com.trading.hyperliquid.util.TradingConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -63,11 +64,22 @@ public class WebhookService {
             Optional<OrderExecution> lastOrderOpt = orderExecutionService.getLastOrderByStrategy(strategy.getId());
 
             // ================================================================
+            // For inverse mode, calculate the actual order side that will be placed
+            // ================================================================
+            OrderExecution.OrderSide actualOrderSide = requestedSide;
+            if (strategy.getInverse()) {
+                actualOrderSide = requestedSide.isBuy()
+                        ? OrderExecution.OrderSide.SELL
+                        : OrderExecution.OrderSide.BUY;
+                log.info("INVERSE MODE: Requested {} will be placed as {}", requestedSide, actualOrderSide);
+            }
+
+            // ================================================================
             // FLOWCHART DECISION 1: Is this First Order?
             // ================================================================
             if (lastOrderOpt.isEmpty()) {
                 log.info("FLOWCHART PATH: First order for strategy - placing immediately");
-                return placeOrderAndReturnResponse(request, strategy, config, user, requestedSide);
+                return placeOrderAndReturnResponse(request, strategy, config, user, actualOrderSide);
             }
 
             OrderExecution lastOrder = lastOrderOpt.get();
@@ -79,17 +91,20 @@ public class WebhookService {
             // ================================================================
             if (lastOrder.getClosedAt() != null) {
                 log.info("FLOWCHART PATH: Previous position closed - placing new order");
-                return placeOrderAndReturnResponse(request, strategy, config, user, requestedSide);
+                return placeOrderAndReturnResponse(request, strategy, config, user, actualOrderSide);
             }
 
             // ================================================================
             // FLOWCHART DECISION 3: Check prev order action and current action
+            // Compare the ACTUAL order sides (not the requested webhook action)
             // ================================================================
             OrderExecution.OrderSide lastOrderSide = lastOrder.getOrderSide();
-            boolean isSameDirection = (lastOrderSide == requestedSide);
+            boolean isSameDirection = (lastOrderSide == actualOrderSide);
+            log.debug("Direction check: lastOrderSide={}, actualOrderSide={}, isSameDirection={}",
+                    lastOrderSide, actualOrderSide, isSameDirection);
 
             OrderPlacementContext context = OrderPlacementContext.from(
-                    request, strategy, requestedSide, lastOrderSide);
+                    request, strategy, actualOrderSide, lastOrderSide);
 
             if (isSameDirection) {
                 return handleSameDirectionOrder(context);
@@ -120,6 +135,7 @@ public class WebhookService {
         // ================================================================
         if (context.getStrategy().getPyramid()) {
             log.info("FLOWCHART PATH: Pyramid=TRUE - allowing add-on order (same direction)");
+            // context.getRequestedSide() already contains the actual order side (after inverse adjustment)
             return placeOrderAndReturnResponse(
                     context.getRequest(),
                     context.getStrategy(),
@@ -166,14 +182,22 @@ public class WebhookService {
             // Determine close action based on the ACTUAL position side in DB/exchange
             // This is independent of inverse mode - we're closing whatever position exists
             String closeAction = context.getLastOrderSide().isBuy() ? "sell" : "buy";
-            log.info("Closing position: lastOrderSide={}, closeAction={}",
-                    context.getLastOrderSide(), closeAction);
 
-            log.info("Executing close order on Hyperliquid...");
-            closeOrderId = hyperliquidService.placeOrder(
+            // Calculate total position size to close (sum of all open positions)
+            // For pyramid mode, this may be larger than a single lot size
+            java.math.BigDecimal totalCloseSize = openPositions.stream()
+                    .map(OrderExecution::getOrderSize)
+                    .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+
+            log.info("Closing position: lastOrderSide={}, closeAction={}, totalSize={}",
+                    context.getLastOrderSide(), closeAction, totalCloseSize);
+
+            log.info("Executing close order on Hyperliquid (reduce_only=true)...");
+            closeOrderId = hyperliquidService.placeCloseOrder(
                     closeAction,
                     context.getConfig(),
-                    context.getUser()
+                    context.getUser(),
+                    totalCloseSize
             );
             log.info("Close order executed. Order ID: {}", closeOrderId);
         } catch (Exception e) {
@@ -192,6 +216,8 @@ public class WebhookService {
         // ================================================================
         if (context.getStrategy().getInverse()) {
             log.info("FLOWCHART PATH: Inverse=TRUE - placing new order in opposite direction");
+            // context.getRequestedSide() already contains the actual order side (after inverse adjustment)
+            // For inverse mode strategy, we want to open a new position in this direction
             return placeOrderAndReturnResponse(
                     context.getRequest(),
                     context.getStrategy(),
@@ -271,12 +297,19 @@ public class WebhookService {
                 log.info("INVERSE MODE: Original action '{}' inverted to '{}'", request.getAction(), actualAction);
             }
 
-            // 1. Place primary order on Hyperliquid
-            String orderId = hyperliquidService.placeOrder(actualAction, config, user);
+            // 1. Place primary order on Hyperliquid - returns OrderResult with order ID and execution price
+            OrderResult orderResult = hyperliquidService.placeOrder(actualAction, config, user);
+            String orderId = orderResult.getOrderId();
             log.info("Primary order placed. Order ID: {}", orderId);
 
-            // 2. Get fill price (mock for POC)
-            BigDecimal fillPrice = getMockPrice(config.getAsset());
+            // 2. Get fill price from order result (real market price), fallback to mock if not available
+            BigDecimal fillPrice = orderResult.getExecutionPrice();
+            if (fillPrice == null) {
+                fillPrice = getMockPrice(config.getAsset());
+                log.warn("No execution price in order result, using mock price: {}", fillPrice);
+            } else {
+                log.info("Using actual execution price for SL calculation: {}", fillPrice);
+            }
 
             // 3. Create OrderExecution record
             OrderExecution execution = orderExecutionService.createOrderExecution(

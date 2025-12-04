@@ -5,12 +5,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.trading.hyperliquid.exception.HyperliquidApiException;
 import com.trading.hyperliquid.model.entity.User;
 import com.trading.hyperliquid.model.hyperliquid.Order;
+import com.trading.hyperliquid.model.hyperliquid.OrderResult;
 import com.trading.hyperliquid.model.hyperliquid.OrderType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.io.*;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
@@ -89,10 +91,10 @@ public class PythonHyperliquidClient {
      * @param order Order to place
      * @param grouping Order grouping ("na" for single orders)
      * @param apiUrl API URL (testnet or mainnet) - informational only, Python SDK determines from isTestnet
-     * @return Order ID from Hyperliquid
+     * @return OrderResult containing order ID and execution price
      * @throws HyperliquidApiException if order placement fails
      */
-    public String placeOrder(User user, Order order, String grouping, String apiUrl) throws HyperliquidApiException {
+    public OrderResult placeOrder(User user, Order order, String grouping, String apiUrl) throws HyperliquidApiException {
         return placeOrder(user, order, grouping, apiUrl, "LIMIT");
     }
 
@@ -104,10 +106,10 @@ public class PythonHyperliquidClient {
      * @param grouping Order grouping ("na" for single orders)
      * @param apiUrl API URL (testnet or mainnet) - informational only, Python SDK determines from isTestnet
      * @param orderType Order type ("MARKET" or "LIMIT")
-     * @return Order ID from Hyperliquid
+     * @return OrderResult containing order ID and execution price
      * @throws HyperliquidApiException if order placement fails
      */
-    public String placeOrder(User user, Order order, String grouping, String apiUrl, String orderType) throws HyperliquidApiException {
+    public OrderResult placeOrder(User user, Order order, String grouping, String apiUrl, String orderType) throws HyperliquidApiException {
         log.info("=== PLACING ORDER VIA PYTHON SDK ===");
         log.info("User: {} (testnet={})", user.getUsername(), user.getIsTestnet());
         log.info("Asset: {} | Side: {} | Size: {} | Type: {}",
@@ -128,8 +130,9 @@ public class PythonHyperliquidClient {
 
             if ("ok".equals(status)) {
                 String orderId = extractOrderId(response);
-                log.info("Order placed successfully! Order ID: {}", orderId);
-                return orderId;
+                BigDecimal executionPrice = extractExecutionPrice(response);
+                log.info("Order placed successfully! Order ID: {}, Execution Price: {}", orderId, executionPrice);
+                return OrderResult.of(orderId, executionPrice);
             } else {
                 String errorMessage = String.valueOf(response.getOrDefault("response", response));
                 log.error("Order failed: {}", errorMessage);
@@ -140,6 +143,54 @@ public class PythonHyperliquidClient {
             throw e;
         } catch (Exception e) {
             log.error("Failed to place order via Python SDK", e);
+            throw new HyperliquidApiException("Python SDK error: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Place a stop-loss trigger order on Hyperliquid via Python SDK
+     *
+     * @param user User entity with credentials
+     * @param order Order to place (contains side, size, and limit price)
+     * @param triggerPrice The price at which the stop-loss triggers
+     * @param tpsl "sl" for stop-loss, "tp" for take-profit
+     * @return OrderResult containing order ID
+     * @throws HyperliquidApiException if order placement fails
+     */
+    public OrderResult placeStopLossOrder(User user, Order order, String triggerPrice, String tpsl) throws HyperliquidApiException {
+        log.info("=== PLACING STOP-LOSS TRIGGER ORDER VIA PYTHON SDK ===");
+        log.info("User: {} (testnet={})", user.getUsername(), user.getIsTestnet());
+        log.info("Asset: {} | Side: {} | Size: {} | Trigger: {} | TPSL: {}",
+                getAssetName(order.getA()),
+                order.getB() ? "BUY" : "SELL",
+                order.getS(),
+                triggerPrice,
+                tpsl);
+
+        try {
+            // Build input data for Python script with trigger info
+            Map<String, Object> inputData = buildTriggerOrderInput(user, order, triggerPrice, tpsl);
+
+            // Execute Python script
+            Map<String, Object> response = executePythonScript(inputData);
+
+            // Parse response
+            String status = String.valueOf(response.get("status"));
+
+            if ("ok".equals(status)) {
+                String orderId = extractOrderId(response);
+                log.info("Stop-loss order placed successfully! Order ID: {}", orderId);
+                return OrderResult.fromOrderId(orderId);
+            } else {
+                String errorMessage = String.valueOf(response.getOrDefault("response", response));
+                log.error("Stop-loss order failed: {}", errorMessage);
+                throw new HyperliquidApiException("Stop-loss order failed: " + errorMessage);
+            }
+
+        } catch (HyperliquidApiException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Failed to place stop-loss order via Python SDK", e);
             throw new HyperliquidApiException("Python SDK error: " + e.getMessage(), e);
         }
     }
@@ -172,6 +223,47 @@ public class PythonHyperliquidClient {
         if (!"MARKET".equalsIgnoreCase(orderType)) {
             input.put("price", order.getP());
         }
+
+        // User credentials
+        input.put("isTestnet", user.getIsTestnet());
+        input.put("hyperliquidAddress", user.getHyperliquidAddress());
+
+        // Private key - prefer API wallet if available
+        if (user.getApiWalletPrivateKey() != null && !user.getApiWalletPrivateKey().isEmpty()) {
+            input.put("apiWalletPrivateKey", user.getApiWalletPrivateKey());
+            log.debug("Using API Wallet for signing");
+        } else if (user.getHyperliquidPrivateKey() != null) {
+            input.put("hyperliquidPrivateKey", user.getHyperliquidPrivateKey());
+            log.debug("Using main wallet for signing");
+        } else {
+            throw new IllegalArgumentException("No private key available for user: " + user.getUsername());
+        }
+
+        return input;
+    }
+
+    /**
+     * Build input data map for trigger orders (stop-loss/take-profit)
+     */
+    private Map<String, Object> buildTriggerOrderInput(User user, Order order, String triggerPrice, String tpsl) {
+        Map<String, Object> input = new HashMap<>();
+
+        // Action type
+        input.put("action", "order");
+
+        // Order details
+        input.put("asset", getAssetName(order.getA()));
+        input.put("isBuy", order.getB());
+        input.put("size", order.getS());
+        input.put("reduceOnly", true);  // Stop-loss orders should always be reduce-only
+        input.put("orderType", "TRIGGER");
+
+        // Trigger-specific fields
+        input.put("triggerPx", triggerPrice);
+        input.put("tpsl", tpsl);
+
+        // Price for limit price when triggered (usually same as trigger price)
+        input.put("price", order.getP());
 
         // User credentials
         input.put("isTestnet", user.getIsTestnet());
@@ -318,6 +410,27 @@ public class PythonHyperliquidClient {
         } catch (Exception e) {
             log.warn("Failed to extract order ID from response: {}", response, e);
             return "UNKNOWN-" + System.currentTimeMillis();
+        }
+    }
+
+    /**
+     * Extract execution price from successful response
+     * The Python script adds executionPrice to the response
+     */
+    private BigDecimal extractExecutionPrice(Map<String, Object> response) {
+        try {
+            // Python script adds executionPrice at the top level
+            Object executionPrice = response.get("executionPrice");
+            if (executionPrice != null) {
+                return new BigDecimal(String.valueOf(executionPrice));
+            }
+
+            log.warn("No executionPrice found in response, returning null");
+            return null;
+
+        } catch (Exception e) {
+            log.warn("Failed to extract execution price from response: {}", response, e);
+            return null;
         }
     }
 

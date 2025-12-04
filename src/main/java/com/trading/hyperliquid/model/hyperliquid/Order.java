@@ -54,4 +54,32 @@ public class Order {
                 .t(OrderType.limit(tif))
                 .build();
     }
+
+    /**
+     * Create a reduce-only buy order (for closing SHORT positions)
+     */
+    public static Order reduceOnlyBuy(int assetId, String price, String size, String tif) {
+        return Order.builder()
+                .a(assetId)
+                .b(true)
+                .p(price)
+                .s(size)
+                .r(true)  // reduce-only = true
+                .t(OrderType.limit(tif))
+                .build();
+    }
+
+    /**
+     * Create a reduce-only sell order (for closing LONG positions)
+     */
+    public static Order reduceOnlySell(int assetId, String price, String size, String tif) {
+        return Order.builder()
+                .a(assetId)
+                .b(false)
+                .p(price)
+                .s(size)
+                .r(true)  // reduce-only = true
+                .t(OrderType.limit(tif))
+                .build();
+    }
 }

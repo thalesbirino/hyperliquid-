@@ -6,7 +6,10 @@ import com.trading.hyperliquid.model.entity.Config;
 import com.trading.hyperliquid.model.entity.OrderExecution;
 import com.trading.hyperliquid.model.entity.User;
 import com.trading.hyperliquid.model.enums.OrderSide;
-import com.trading.hyperliquid.model.hyperliquid.*;
+import com.trading.hyperliquid.model.hyperliquid.Order;
+import com.trading.hyperliquid.model.hyperliquid.OrderAction;
+import com.trading.hyperliquid.model.hyperliquid.OrderResult;
+import com.trading.hyperliquid.model.hyperliquid.OrderType;
 import com.trading.hyperliquid.util.ErrorMessages;
 import com.trading.hyperliquid.util.NonceManager;
 import com.trading.hyperliquid.util.TradingConstants;
@@ -65,11 +68,11 @@ public class HyperliquidService {
      * @param action the order action string ("buy" or "sell")
      * @param config the trading configuration containing asset, lot size, leverage, and risk management params
      * @param user the user with Hyperliquid wallet credentials and testnet/mainnet configuration
-     * @return the order ID (mock ID in POC mode, real order ID when integrated with API)
+     * @return OrderResult containing order ID and execution price
      * @throws IllegalArgumentException if validation fails (invalid action, missing config, invalid lot size)
      * @throws HyperliquidApiException if order placement fails
      */
-    public String placeOrder(String action, Config config, User user) {
+    public OrderResult placeOrder(String action, Config config, User user) {
         try {
             // Parse and validate order side
             OrderSide orderSide = OrderSide.fromAction(action);
@@ -110,7 +113,8 @@ public class HyperliquidService {
             // 3. Parse and return actual response
 
             if (mockMode) {
-                return executeMockOrder(orderSide, config, user, mockPrice, order, nonce, apiUrl, accountType);
+                String orderId = executeMockOrder(orderSide, config, user, mockPrice, order, nonce, apiUrl, accountType);
+                return OrderResult.of(orderId, mockPrice);
             } else {
                 // Real API call to Hyperliquid via Python SDK
                 if (pythonClient == null) {
@@ -125,6 +129,80 @@ public class HyperliquidService {
 
         } catch (Exception e) {
             logger.error("Failed to place order: {}", e.getMessage(), e);
+            throw new HyperliquidApiException(ErrorMessages.ORDER_EXECUTION_FAILED + ": " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Place a CLOSE order on Hyperliquid Exchange using reduce-only flag.
+     * This ensures the order only reduces existing positions, not opens new ones.
+     * Uses the config lot size as the close size.
+     *
+     * @param action the close action string ("buy" to close SHORT, "sell" to close LONG)
+     * @param config the trading configuration containing asset, lot size, leverage
+     * @param user the user with Hyperliquid wallet credentials
+     * @return the order ID (for close orders, execution price is less important)
+     * @throws HyperliquidApiException if order placement fails
+     */
+    public String placeCloseOrder(String action, Config config, User user) {
+        return placeCloseOrder(action, config, user, config.getLotSize());
+    }
+
+    /**
+     * Place a CLOSE order on Hyperliquid Exchange using reduce-only flag with specified size.
+     * This ensures the order only reduces existing positions, not opens new ones.
+     *
+     * @param action the close action string ("buy" to close SHORT, "sell" to close LONG)
+     * @param config the trading configuration containing asset, lot size, leverage
+     * @param user the user with Hyperliquid wallet credentials
+     * @param closeSize the total size to close (may be larger than lot size for pyramid positions)
+     * @return the order ID (for close orders, execution price is less important)
+     * @throws HyperliquidApiException if order placement fails
+     */
+    public String placeCloseOrder(String action, Config config, User user, BigDecimal closeSize) {
+        try {
+            OrderSide orderSide = OrderSide.fromAction(action);
+            validateOrderRequest(orderSide, config, user);
+
+            String apiUrl = getApiUrl(user);
+            String accountType = user.getIsTestnet() ? "TESTNET (DEMO)" : "MAINNET (REAL)";
+            logger.info("Placing CLOSE order (reduce_only=true): {} {} {} on {}",
+                    action.toUpperCase(), closeSize, config.getAsset(), accountType);
+
+            BigDecimal mockPrice = getMockPrice(config.getAsset());
+
+            // Build reduce-only order for closing positions - use provided closeSize
+            Order order = orderSide.isBuy()
+                    ? Order.reduceOnlyBuy(
+                            config.getAssetId(),
+                            mockPrice.toPlainString(),
+                            closeSize.toPlainString(),
+                            config.getTimeInForce()
+                    )
+                    : Order.reduceOnlySell(
+                            config.getAssetId(),
+                            mockPrice.toPlainString(),
+                            closeSize.toPlainString(),
+                            config.getTimeInForce()
+                    );
+
+            long nonce = nonceManager.getNextNonce(user.getHyperliquidAddress());
+
+            if (mockMode) {
+                return executeMockOrder(orderSide, config, user, mockPrice, order, nonce, apiUrl, accountType);
+            } else {
+                if (pythonClient == null) {
+                    throw new HyperliquidApiException("Python API client not initialized.");
+                }
+                logger.info("REAL MODE: Placing CLOSE order via Python SDK - Asset: {}, Side: {}, Size: {}, ReduceOnly: true",
+                    config.getAsset(), orderSide.getAction(), closeSize);
+                String orderType = config.getOrderType() != null ? config.getOrderType().name() : "LIMIT";
+                OrderResult result = pythonClient.placeOrder(user, order, "na", apiUrl, orderType);
+                return result.getOrderId();
+            }
+
+        } catch (Exception e) {
+            logger.error("Failed to place close order: {}", e.getMessage(), e);
             throw new HyperliquidApiException(ErrorMessages.ORDER_EXECUTION_FAILED + ": " + e.getMessage(), e);
         }
     }
@@ -340,13 +418,15 @@ public class HyperliquidService {
                 return executeMockStopLoss(orderSide, slOrderSide, assetId, stopLossPrice, size,
                         groupingType, config, user, nonce, apiUrl, accountType);
             } else {
-                // Real API call to Hyperliquid with stop-loss via Python SDK
+                // Real API call to Hyperliquid with stop-loss via Python SDK using TRIGGER order type
                 if (pythonClient == null) {
                     throw new HyperliquidApiException("Python API client not initialized. Check application configuration.");
                 }
-                logger.info("REAL MODE: Placing stop-loss order via Python SDK - Asset ID: {}, Price: {}, Grouping: {}, User: {}",
+                logger.info("REAL MODE: Placing TRIGGER stop-loss order via Python SDK - Asset ID: {}, Trigger Price: {}, Grouping: {}, User: {}",
                     assetId, stopLossPrice, grouping, user.getUsername());
-                return pythonClient.placeOrder(user, slOrder, grouping, apiUrl);
+                // Use dedicated stop-loss method with trigger order type
+                OrderResult result = pythonClient.placeStopLossOrder(user, slOrder, stopLossPrice.toPlainString(), TradingConstants.TPSL_STOP_LOSS);
+                return result.getOrderId();
             }
 
         } catch (Exception e) {
